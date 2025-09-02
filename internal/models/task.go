@@ -28,17 +28,24 @@ func (m *TaskModel) Create(task *types.Task) error {
 		task.Status = types.TaskPending
 	}
 
+	fmt.Printf("Executing query: %s\n", query)
+	fmt.Printf("With values: ProjectID=%d, JiraTicketID=%s, JiraTitle=%s, Title=%s, Description=%s, ScheduledDate=%v, Deadline=%v, Status=%s, CreatedAt=%v, UpdatedAt=%v\n", 
+		task.ProjectID, task.JiraTicketID, task.JiraTitle, task.Title, task.Description, task.ScheduledDate, task.Deadline, task.Status, task.CreatedAt, task.UpdatedAt)
+
 	result, err := m.db.Exec(query, task.ProjectID, task.JiraTicketID, task.JiraTitle, task.Title, task.Description, task.ScheduledDate, task.Deadline, task.Status, task.CreatedAt, task.UpdatedAt)
 	if err != nil {
+		fmt.Printf("Database error: %v\n", err)
 		return fmt.Errorf("failed to create task: %w", err)
 	}
 
 	id, err := result.LastInsertId()
 	if err != nil {
+		fmt.Printf("Failed to get last insert ID: %v\n", err)
 		return fmt.Errorf("failed to get task ID: %w", err)
 	}
 
 	task.ID = id
+	fmt.Printf("Task created successfully with ID: %d\n", task.ID)
 	return nil
 }
 

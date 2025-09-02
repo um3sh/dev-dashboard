@@ -519,21 +519,36 @@ func (a *App) RefreshAllJiraTitles() error {
 // Enhanced Task Methods
 
 func (a *App) CreateTaskWithJiraTitle(task types.Task) error {
+	log.Printf("CreateTaskWithJiraTitle called with task: %+v", task)
+	
 	if a.taskModel == nil {
+		log.Printf("Error: task model not initialized")
 		return fmt.Errorf("task model not initialized")
 	}
 	
 	// If JIRA ticket ID is provided and JIRA client is configured, fetch the title
 	if task.JiraTicketID != "" && a.jiraClient != nil {
+		log.Printf("Fetching JIRA title for ticket: %s", task.JiraTicketID)
 		title, err := a.FetchJiraTicketTitle(task.JiraTicketID)
 		if err != nil {
 			log.Printf("Warning: Failed to fetch JIRA title for %s: %v", task.JiraTicketID, err)
 		} else {
 			task.JiraTitle = title
+			log.Printf("Successfully fetched JIRA title: %s", title)
 		}
+	} else {
+		log.Printf("Skipping JIRA title fetch - ticketID: %s, jiraClient: %v", task.JiraTicketID, a.jiraClient != nil)
 	}
 	
-	return a.taskModel.Create(&task)
+	log.Printf("Creating task with data: %+v", task)
+	err := a.taskModel.Create(&task)
+	if err != nil {
+		log.Printf("Error creating task: %v", err)
+		return fmt.Errorf("failed to create task: %w", err)
+	}
+	
+	log.Printf("Task created successfully with ID: %d", task.ID)
+	return nil
 }
 
 // Greet returns a greeting for the given name (keeping original method for compatibility)

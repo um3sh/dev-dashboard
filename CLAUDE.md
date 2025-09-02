@@ -169,3 +169,53 @@ export SSH_PASSPHRASE=your_ssh_key_passphrase
 - macOS DMG: Use `create-dmg` tool to create installable `.dmg` file from `.app` bundle
 - Cross-compilation: macOS builds must be done on macOS systems (cross-compilation not supported)
 - Built application includes all frontend assets and is completely self-contained
+
+## Debugging and Logs
+
+### Application Logs Location
+
+**macOS:**
+- When run from terminal: Logs appear in the terminal window
+- When run as `.app` bundle: Check Console.app for application logs
+  - Open Applications → Utilities → Console.app
+  - Filter by "GitHub Dashboard" or search for your app name
+  - Look for entries from your application process
+
+**Alternative methods for macOS:**
+```bash
+# Run the app from terminal to see logs directly
+./build/bin/GitHub\ Dashboard.app/Contents/MacOS/gh-dashboard
+
+# Or check system logs
+log stream --predicate 'process == "gh-dashboard"'
+```
+
+**Linux:**
+- Terminal output when running `./build/bin/gh-dashboard`
+- System logs: `journalctl -f -u your-service-name` (if running as service)
+
+**Windows:**
+- Command prompt output when running `gh-dashboard.exe`
+- Windows Event Viewer for application errors
+
+### Database Location
+- **macOS/Linux**: `~/.gh-dashboard/database.db`
+- **Windows**: `%USERPROFILE%\.gh-dashboard\database.db`
+
+### Troubleshooting Common Issues
+
+**Task Creation Failures:**
+1. Check if database has been migrated properly (look for "jira_title" column)
+2. Verify project exists before creating tasks
+3. Check JIRA configuration if using JIRA integration
+4. Look for specific error messages in logs
+
+**JIRA Integration Issues:**
+1. Test connection in Settings page first
+2. Check authentication method (Basic vs Bearer)
+3. Verify API permissions for your JIRA user
+4. Enterprise JIRA may require different API endpoints
+
+**Database Migration:**
+- The app automatically migrates existing databases to add new columns
+- If issues persist, backup and delete `~/.gh-dashboard/database.db` to force fresh schema creation
