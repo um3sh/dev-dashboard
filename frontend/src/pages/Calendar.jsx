@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { GetTasksInDateRange, UpdateTaskStatus } from '../../wailsjs/go/main/App';
-import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Clock, CheckCircle } from 'lucide-react';
+import { GetTasksInDateRange, GetTasksGroupedByScheduledDate, UpdateTaskStatus } from '../../wailsjs/go/main/App';
+import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Clock, CheckCircle, Filter } from 'lucide-react';
 
 const Calendar = () => {
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -9,18 +9,24 @@ const Calendar = () => {
   const [error, setError] = useState(null);
   const [selectedDate, setSelectedDate] = useState(null);
   const [selectedDateTasks, setSelectedDateTasks] = useState([]);
+  const [viewMode, setViewMode] = useState('deadline'); // 'deadline' or 'scheduled'
 
   useEffect(() => {
     loadTasks();
   }, [currentDate]);
 
+  // Update selected date tasks when view mode changes
+  useEffect(() => {
+    if (selectedDate) {
+      setSelectedDateTasks(getTasksForDate(selectedDate));
+    }
+  }, [viewMode, tasks]);
+
   const loadTasks = async () => {
     setLoading(true);
     try {
-      const startDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
-      const endDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
-      
-      const data = await GetTasksInDateRange(startDate.toISOString(), endDate.toISOString());
+      // Get all tasks instead of just date-filtered ones
+      const data = await GetTasksGroupedByScheduledDate();
       setTasks(data || []);
     } catch (err) {
       setError('Failed to load tasks: ' + err.message);
@@ -36,11 +42,7 @@ const Calendar = () => {
       
       // Update selected date tasks if needed
       if (selectedDate) {
-        const dateStr = selectedDate.toDateString();
-        const dateTasks = tasks.filter(task => 
-          new Date(task.deadline).toDateString() === dateStr
-        );
-        setSelectedDateTasks(dateTasks);
+        setSelectedDateTasks(getTasksForDate(selectedDate));
       }
     } catch (err) {
       setError('Failed to update task status: ' + err.message);
@@ -81,9 +83,16 @@ const Calendar = () => {
   const getTasksForDate = (date) => {
     if (!date) return [];
     const dateStr = date.toDateString();
-    return tasks.filter(task => 
-      task.deadline && new Date(task.deadline).toDateString() === dateStr
-    );
+    
+    if (viewMode === 'deadline') {
+      return tasks.filter(task => 
+        task.deadline && new Date(task.deadline).toDateString() === dateStr
+      );
+    } else {
+      return tasks.filter(task => 
+        task.scheduled_date && new Date(task.scheduled_date).toDateString() === dateStr
+      );
+    }
   };
 
   const handleDateClick = (date) => {
@@ -133,7 +142,32 @@ const Calendar = () => {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Task Calendar</h1>
-          <p className="text-gray-600">View and manage task deadlines in calendar view</p>
+          <p className="text-gray-600">View and manage tasks by {viewMode === 'deadline' ? 'deadline' : 'scheduled date'}</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Filter className="w-4 h-4 text-gray-500" />
+          <div className="bg-gray-100 rounded-lg p-1 flex">
+            <button
+              onClick={() => setViewMode('deadline')}
+              className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
+                viewMode === 'deadline'
+                  ? 'bg-white text-gray-900 shadow'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              Deadlines
+            </button>
+            <button
+              onClick={() => setViewMode('scheduled')}
+              className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
+                viewMode === 'scheduled'
+                  ? 'bg-white text-gray-900 shadow'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              Scheduled
+            </button>
+          </div>
         </div>
       </div>
 
@@ -206,9 +240,9 @@ const Calendar = () => {
                               <div
                                 key={task.id}
                                 className={`text-xs p-1 rounded truncate ${
-                                  isOverdue(task) ? 'bg-red-100 text-red-800' : getStatusColor(task.status)
+                                  viewMode === 'deadline' && isOverdue(task) ? 'bg-red-100 text-red-800' : getStatusColor(task.status)
                                 }`}
-                                title={`${task.project_name}: ${task.title}`}
+                                title={`${task.project_name}: ${task.jira_title || task.title} (${task.jira_ticket_id})`}
                               >
                                 {task.jira_ticket_id}
                               </div>
@@ -236,7 +270,7 @@ const Calendar = () => {
               <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
                 <CalendarIcon className="w-5 h-5" />
                 {selectedDate ? (
-                  <>Tasks for {selectedDate.toLocaleDateString()}</>
+                  <>{viewMode === 'deadline' ? 'Deadlines' : 'Scheduled Tasks'} for {selectedDate.toLocaleDateString()}</>
                 ) : (
                   'Select a Date'
                 )}
@@ -246,24 +280,39 @@ const Calendar = () => {
               {!selectedDate ? (
                 <p className="text-gray-500 text-center">Click on a date to view tasks</p>
               ) : selectedDateTasks.length === 0 ? (
-                <p className="text-gray-500 text-center">No tasks for this date</p>
+                <p className="text-gray-500 text-center">
+                  No {viewMode === 'deadline' ? 'deadlines' : 'scheduled tasks'} for this date
+                </p>
               ) : (
                 <div className="space-y-3">
                   {selectedDateTasks.map(task => (
                     <div key={task.id} className={`p-3 border rounded-lg ${
-                      isOverdue(task) ? 'border-red-200 bg-red-50' : 'border-gray-200'
+                      viewMode === 'deadline' && isOverdue(task) ? 'border-red-200 bg-red-50' : 'border-gray-200'
                     }`}>
                       <div className="flex items-start justify-between mb-2">
                         <div className="flex-1">
-                          <h3 className="font-medium text-gray-900">{task.jira_ticket_id}</h3>
-                          <p className="text-sm text-gray-600">{task.project_name}</p>
+                          <div className="flex items-center gap-2 mb-1">
+                            <h3 className="font-medium text-gray-900">{task.jira_ticket_id}</h3>
+                            {viewMode === 'deadline' && isOverdue(task) && (
+                              <span className="text-red-600 text-xs flex items-center gap-1">
+                                <Clock className="w-3 h-3" />
+                                Overdue
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-sm font-medium text-gray-800 mb-1">
+                            {task.jira_title || task.title}
+                          </p>
+                          <p className="text-xs text-gray-600">Project: {task.project_name}</p>
+                          <div className="flex gap-4 text-xs text-gray-500 mt-1">
+                            {task.scheduled_date && (
+                              <span>Scheduled: {new Date(task.scheduled_date).toLocaleDateString()}</span>
+                            )}
+                            {task.deadline && (
+                              <span>Due: {new Date(task.deadline).toLocaleDateString()}</span>
+                            )}
+                          </div>
                         </div>
-                        {isOverdue(task) && (
-                          <span className="text-red-600 text-xs flex items-center gap-1">
-                            <Clock className="w-3 h-3" />
-                            Overdue
-                          </span>
-                        )}
                       </div>
                       
                       <div className="flex items-center justify-between">
