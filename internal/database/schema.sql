@@ -68,6 +68,7 @@ CREATE TABLE IF NOT EXISTS tasks (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     project_id INTEGER NOT NULL,
     jira_ticket_id TEXT NOT NULL,
+    jira_title TEXT,
     title TEXT NOT NULL,
     description TEXT,
     scheduled_date DATE,
@@ -77,6 +78,12 @@ CREATE TABLE IF NOT EXISTS tasks (
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
     UNIQUE(project_id, jira_ticket_id)
+);
+
+CREATE TABLE IF NOT EXISTS config (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Indexes for better query performance
@@ -95,6 +102,7 @@ CREATE INDEX IF NOT EXISTS idx_tasks_deadline ON tasks(deadline);
 CREATE INDEX IF NOT EXISTS idx_tasks_scheduled_date ON tasks(scheduled_date);
 CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
 CREATE INDEX IF NOT EXISTS idx_tasks_jira_ticket_id ON tasks(jira_ticket_id);
+CREATE INDEX IF NOT EXISTS idx_config_key ON config(key);
 
 -- Triggers to update updated_at timestamps
 CREATE TRIGGER IF NOT EXISTS update_repositories_updated_at
@@ -131,4 +139,10 @@ CREATE TRIGGER IF NOT EXISTS update_tasks_updated_at
     AFTER UPDATE ON tasks
 BEGIN
     UPDATE tasks SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
+END;
+
+CREATE TRIGGER IF NOT EXISTS update_config_updated_at
+    AFTER UPDATE ON config
+BEGIN
+    UPDATE config SET updated_at = CURRENT_TIMESTAMP WHERE key = NEW.key;
 END;

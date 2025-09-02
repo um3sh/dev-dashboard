@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
-import { CreateTask } from '../../wailsjs/go/main/App';
-import { X } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { CreateTaskWithJiraTitle, FetchJiraTicketTitle } from '../../wailsjs/go/main/App';
+import { X, RefreshCw, Check, AlertCircle } from 'lucide-react';
 
 const TaskModal = ({ project, onClose, onTaskCreated }) => {
   const [formData, setFormData] = useState({
@@ -10,6 +10,43 @@ const TaskModal = ({ project, onClose, onTaskCreated }) => {
   });
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [jiraTitle, setJiraTitle] = useState('');
+  const [isLoadingJiraTitle, setIsLoadingJiraTitle] = useState(false);
+  const [jiraTitleStatus, setJiraTitleStatus] = useState(''); // 'success', 'error', or ''
+
+  const fetchJiraTitle = async (ticketId) => {
+    if (!ticketId.trim()) {
+      setJiraTitle('');
+      setJiraTitleStatus('');
+      return;
+    }
+
+    setIsLoadingJiraTitle(true);
+    setJiraTitleStatus('');
+    
+    try {
+      const title = await FetchJiraTicketTitle(ticketId.trim());
+      setJiraTitle(title);
+      setJiraTitleStatus('success');
+    } catch (err) {
+      console.error('Failed to fetch JIRA title:', err);
+      setJiraTitle('');
+      setJiraTitleStatus('error');
+    } finally {
+      setIsLoadingJiraTitle(false);
+    }
+  };
+
+  // Auto-fetch JIRA title when ticket ID changes
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (formData.jira_ticket_id) {
+        fetchJiraTitle(formData.jira_ticket_id);
+      }
+    }, 1000); // Debounce for 1 second
+
+    return () => clearTimeout(timer);
+  }, [formData.jira_ticket_id]);
 
   const validateForm = () => {
     const newErrors = {};
@@ -60,14 +97,15 @@ const TaskModal = ({ project, onClose, onTaskCreated }) => {
       const taskData = {
         project_id: project.id,
         jira_ticket_id: formData.jira_ticket_id.trim(),
-        title: `Task for ${formData.jira_ticket_id.trim()}`,
+        jira_title: jiraTitle,
+        title: jiraTitle || `Task for ${formData.jira_ticket_id.trim()}`,
         description: `Task associated with Jira ticket ${formData.jira_ticket_id.trim()}`,
         scheduled_date: new Date(formData.scheduled_date + 'T00:00:00').toISOString(),
         deadline: formData.deadline ? new Date(formData.deadline + 'T23:59:59').toISOString() : null,
         status: 'pending'
       };
 
-      await CreateTask(taskData);
+      await CreateTaskWithJiraTitle(taskData);
       onTaskCreated();
     } catch (err) {
       setErrors({ submit: err.message || 'Failed to create task' });
@@ -119,20 +157,47 @@ const TaskModal = ({ project, onClose, onTaskCreated }) => {
               <label htmlFor="jira_ticket_id" className="block text-sm font-medium text-gray-700 mb-1">
                 Jira Ticket ID *
               </label>
-              <input
-                type="text"
-                id="jira_ticket_id"
-                name="jira_ticket_id"
-                value={formData.jira_ticket_id}
-                onChange={handleInputChange}
-                className={`w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                  errors.jira_ticket_id ? 'border-red-500' : 'border-gray-300'
-                }`}
-                placeholder="e.g., ABC-123, PROJ-456"
-                disabled={isSubmitting}
-              />
+              <div className="relative">
+                <input
+                  type="text"
+                  id="jira_ticket_id"
+                  name="jira_ticket_id"
+                  value={formData.jira_ticket_id}
+                  onChange={handleInputChange}
+                  className={`w-full border rounded-lg px-3 py-2 pr-10 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                    errors.jira_ticket_id ? 'border-red-500' : 'border-gray-300'
+                  }`}
+                  placeholder="e.g., ABC-123, PROJ-456"
+                  disabled={isSubmitting}
+                />
+                <div className="absolute inset-y-0 right-0 flex items-center pr-3">
+                  {isLoadingJiraTitle && (
+                    <RefreshCw className="w-4 h-4 animate-spin text-gray-400" />
+                  )}
+                  {!isLoadingJiraTitle && jiraTitleStatus === 'success' && (
+                    <Check className="w-4 h-4 text-green-600" />
+                  )}
+                  {!isLoadingJiraTitle && jiraTitleStatus === 'error' && (
+                    <AlertCircle className="w-4 h-4 text-red-600" />
+                  )}
+                </div>
+              </div>
               {errors.jira_ticket_id && (
                 <p className="text-red-500 text-sm mt-1">{errors.jira_ticket_id}</p>
+              )}
+              {jiraTitle && jiraTitleStatus === 'success' && (
+                <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded-md">
+                  <p className="text-sm text-green-800">
+                    <strong>JIRA Title:</strong> {jiraTitle}
+                  </p>
+                </div>
+              )}
+              {jiraTitleStatus === 'error' && (
+                <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded-md">
+                  <p className="text-sm text-yellow-800">
+                    Could not fetch JIRA title. Please check your ticket ID and JIRA configuration.
+                  </p>
+                </div>
               )}
               <p className="text-xs text-gray-500 mt-1">
                 Enter the Jira ticket identifier for this task

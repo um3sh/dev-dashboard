@@ -9,7 +9,8 @@ import {
   Github,
   FolderOpen,
   Calendar,
-  CheckSquare
+  CheckSquare,
+  Settings
 } from 'lucide-react';
 
 const Layout = ({ children }) => {
@@ -23,6 +24,7 @@ const Layout = ({ children }) => {
     { name: 'Projects', href: '/projects', icon: FolderOpen },
     { name: 'Tasks', href: '/tasks', icon: CheckSquare },
     { name: 'Calendar', href: '/calendar', icon: Calendar },
+    { name: 'Settings', href: '/settings', icon: Settings },
   ];
 
   const isActive = (href) => {

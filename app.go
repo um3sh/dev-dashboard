@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"gh-dashboard/internal/database"
+	"gh-dashboard/internal/jira"
 	"gh-dashboard/internal/models"
 	"gh-dashboard/internal/sync"
 	"gh-dashboard/pkg/types"
@@ -24,6 +25,8 @@ type App struct {
 	actionModel     *models.ActionModel
 	projectModel    *models.ProjectModel
 	taskModel       *models.TaskModel
+	configModel     *models.ConfigModel
+	jiraClient      *jira.Client
 	syncService     *sync.Service
 }
 
@@ -65,6 +68,10 @@ func (a *App) startup(ctx context.Context) {
 	a.actionModel = models.NewActionModel(db.GetConn())
 	a.projectModel = models.NewProjectModel(db.GetConn())
 	a.taskModel = models.NewTaskModel(db.GetConn())
+	a.configModel = models.NewConfigModel(db.GetConn())
+	
+	// Initialize JIRA client if configured
+	a.initJiraClient()
 	
 	// Initialize sync service with GitHub token and SSH key from environment
 	githubToken := os.Getenv("GITHUB_TOKEN")
@@ -353,6 +360,169 @@ func (a *App) GetTasksGroupedByScheduledDate() ([]*types.TaskWithProject, error)
 		return []*types.TaskWithProject{}, nil
 	}
 	return a.taskModel.GetTasksGroupedByScheduledDate()
+}
+
+// Configuration Management Methods
+
+func (a *App) GetConfig(key string) (string, error) {
+	if a.configModel == nil {
+		return "", fmt.Errorf("config model not initialized")
+	}
+	
+	config, err := a.configModel.Get(key)
+	if err != nil {
+		return "", err
+	}
+	
+	if config == nil {
+		return "", nil // No config found
+	}
+	
+	return config.Value, nil
+}
+
+func (a *App) SetConfig(key, value string) error {
+	if a.configModel == nil {
+		return fmt.Errorf("config model not initialized")
+	}
+	
+	err := a.configModel.Set(key, value)
+	if err != nil {
+		return err
+	}
+	
+	// Reinitialize JIRA client if JIRA config was changed
+	if key == "jira_url" || key == "jira_token" {
+		a.initJiraClient()
+	}
+	
+	return nil
+}
+
+func (a *App) GetAllConfig() (map[string]string, error) {
+	if a.configModel == nil {
+		return map[string]string{}, nil
+	}
+	return a.configModel.GetAll()
+}
+
+// JIRA Integration Methods
+
+func (a *App) initJiraClient() {
+	if a.configModel == nil {
+		return
+	}
+	
+	jiraURL, _ := a.configModel.Get("jira_url")
+	jiraToken, _ := a.configModel.Get("jira_token")
+	
+	if jiraURL != nil && jiraToken != nil && jiraURL.Value != "" && jiraToken.Value != "" {
+		a.jiraClient = jira.NewClient(jiraURL.Value, jiraToken.Value)
+		log.Println("JIRA client initialized")
+	}
+}
+
+func (a *App) TestJiraConnection() error {
+	if a.jiraClient == nil {
+		return fmt.Errorf("JIRA client not configured")
+	}
+	return a.jiraClient.TestConnection()
+}
+
+func (a *App) FetchJiraTicketTitle(ticketID string) (string, error) {
+	if a.jiraClient == nil {
+		return "", fmt.Errorf("JIRA client not configured")
+	}
+	
+	issue, err := a.jiraClient.GetIssue(ticketID)
+	if err != nil {
+		return "", err
+	}
+	
+	return issue.Fields.Summary, nil
+}
+
+func (a *App) UpdateTaskJiraTitle(taskID int64, ticketID string) error {
+	if a.taskModel == nil {
+		return fmt.Errorf("task model not initialized")
+	}
+	
+	if a.jiraClient == nil {
+		return fmt.Errorf("JIRA client not configured")
+	}
+	
+	title, err := a.FetchJiraTicketTitle(ticketID)
+	if err != nil {
+		log.Printf("Failed to fetch JIRA ticket title for %s: %v", ticketID, err)
+		return err
+	}
+	
+	return a.taskModel.UpdateJiraTitle(taskID, title)
+}
+
+func (a *App) RefreshAllJiraTitles() error {
+	if a.taskModel == nil {
+		return fmt.Errorf("task model not initialized")
+	}
+	
+	if a.jiraClient == nil {
+		return fmt.Errorf("JIRA client not configured")
+	}
+	
+	// Get all tasks
+	tasks, err := a.taskModel.GetAllWithProjects()
+	if err != nil {
+		return err
+	}
+	
+	var errors []string
+	successCount := 0
+	
+	for _, task := range tasks {
+		if task.JiraTicketID != "" {
+			title, err := a.FetchJiraTicketTitle(task.JiraTicketID)
+			if err != nil {
+				errors = append(errors, fmt.Sprintf("Failed to fetch title for %s: %v", task.JiraTicketID, err))
+				continue
+			}
+			
+			err = a.taskModel.UpdateJiraTitle(task.ID, title)
+			if err != nil {
+				errors = append(errors, fmt.Sprintf("Failed to update title for task %d: %v", task.ID, err))
+				continue
+			}
+			
+			successCount++
+		}
+	}
+	
+	log.Printf("Refreshed %d JIRA titles, %d errors", successCount, len(errors))
+	
+	if len(errors) > 0 {
+		return fmt.Errorf("some titles failed to refresh: %v", errors)
+	}
+	
+	return nil
+}
+
+// Enhanced Task Methods
+
+func (a *App) CreateTaskWithJiraTitle(task types.Task) error {
+	if a.taskModel == nil {
+		return fmt.Errorf("task model not initialized")
+	}
+	
+	// If JIRA ticket ID is provided and JIRA client is configured, fetch the title
+	if task.JiraTicketID != "" && a.jiraClient != nil {
+		title, err := a.FetchJiraTicketTitle(task.JiraTicketID)
+		if err != nil {
+			log.Printf("Warning: Failed to fetch JIRA title for %s: %v", task.JiraTicketID, err)
+		} else {
+			task.JiraTitle = title
+		}
+	}
+	
+	return a.taskModel.Create(&task)
 }
 
 // Greet returns a greeting for the given name (keeping original method for compatibility)

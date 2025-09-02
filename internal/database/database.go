@@ -45,8 +45,8 @@ func NewDB(dbPath string) (*DB, error) {
 func (db *DB) initSchema() error {
 	// Check if tables already exist
 	var tableCount int
-	err := db.conn.QueryRow("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name IN ('repositories', 'projects', 'tasks')").Scan(&tableCount)
-	if err == nil && tableCount > 0 {
+	err := db.conn.QueryRow("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name IN ('repositories', 'projects', 'tasks', 'config')").Scan(&tableCount)
+	if err == nil && tableCount >= 4 {
 		// Schema already initialized
 		return nil
 	}

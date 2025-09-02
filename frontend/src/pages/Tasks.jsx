@@ -220,7 +220,12 @@ const Tasks = () => {
                           </span>
                         </div>
 
-                        <h3 className="font-medium text-gray-900 mb-2">{task.title}</h3>
+                        <h3 className="font-medium text-gray-900 mb-2">
+                          {task.jira_title || task.title}
+                        </h3>
+                        {task.jira_title && task.jira_title !== task.title && (
+                          <p className="text-sm text-gray-600 mb-2">Original: {task.title}</p>
+                        )}
                         
                         <div className="text-sm text-gray-600 space-y-1">
                           <p>Project: <span className="font-medium">{task.project_name}</span></p>

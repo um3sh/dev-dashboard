@@ -9,11 +9,19 @@ export function CreateRepository(arg1:types.Repository):Promise<void>;
 
 export function CreateTask(arg1:types.Task):Promise<void>;
 
+export function CreateTaskWithJiraTitle(arg1:types.Task):Promise<void>;
+
 export function DeleteProject(arg1:number):Promise<void>;
 
 export function DeleteRepository(arg1:number):Promise<void>;
 
 export function DeleteTask(arg1:number):Promise<void>;
+
+export function FetchJiraTicketTitle(arg1:string):Promise<string>;
+
+export function GetAllConfig():Promise<Record<string, string>>;
+
+export function GetConfig(arg1:string):Promise<string>;
 
 export function GetDashboardStats():Promise<Record<string, any>>;
 
@@ -45,12 +53,20 @@ export function GetTasksInDateRange(arg1:time.Time,arg2:time.Time):Promise<Array
 
 export function Greet(arg1:string):Promise<string>;
 
+export function RefreshAllJiraTitles():Promise<void>;
+
+export function SetConfig(arg1:string,arg2:string):Promise<void>;
+
 export function SyncRepository(arg1:number):Promise<void>;
+
+export function TestJiraConnection():Promise<void>;
 
 export function UpdateProject(arg1:types.Project):Promise<void>;
 
 export function UpdateRepository(arg1:types.Repository):Promise<void>;
 
 export function UpdateTask(arg1:types.Task):Promise<void>;
+
+export function UpdateTaskJiraTitle(arg1:number,arg2:string):Promise<void>;
 
 export function UpdateTaskStatus(arg1:number,arg2:types.TaskStatus):Promise<void>;

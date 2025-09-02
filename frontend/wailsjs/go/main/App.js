@@ -14,6 +14,10 @@ export function CreateTask(arg1) {
   return window['go']['main']['App']['CreateTask'](arg1);
 }
 
+export function CreateTaskWithJiraTitle(arg1) {
+  return window['go']['main']['App']['CreateTaskWithJiraTitle'](arg1);
+}
+
 export function DeleteProject(arg1) {
   return window['go']['main']['App']['DeleteProject'](arg1);
 }
@@ -24,6 +28,18 @@ export function DeleteRepository(arg1) {
 
 export function DeleteTask(arg1) {
   return window['go']['main']['App']['DeleteTask'](arg1);
+}
+
+export function FetchJiraTicketTitle(arg1) {
+  return window['go']['main']['App']['FetchJiraTicketTitle'](arg1);
+}
+
+export function GetAllConfig() {
+  return window['go']['main']['App']['GetAllConfig']();
+}
+
+export function GetConfig(arg1) {
+  return window['go']['main']['App']['GetConfig'](arg1);
 }
 
 export function GetDashboardStats() {
@@ -86,8 +102,20 @@ export function Greet(arg1) {
   return window['go']['main']['App']['Greet'](arg1);
 }
 
+export function RefreshAllJiraTitles() {
+  return window['go']['main']['App']['RefreshAllJiraTitles']();
+}
+
+export function SetConfig(arg1, arg2) {
+  return window['go']['main']['App']['SetConfig'](arg1, arg2);
+}
+
 export function SyncRepository(arg1) {
   return window['go']['main']['App']['SyncRepository'](arg1);
+}
+
+export function TestJiraConnection() {
+  return window['go']['main']['App']['TestJiraConnection']();
 }
 
 export function UpdateProject(arg1) {
@@ -100,6 +128,10 @@ export function UpdateRepository(arg1) {
 
 export function UpdateTask(arg1) {
   return window['go']['main']['App']['UpdateTask'](arg1);
+}
+
+export function UpdateTaskJiraTitle(arg1, arg2) {
+  return window['go']['main']['App']['UpdateTaskJiraTitle'](arg1, arg2);
 }
 
 export function UpdateTaskStatus(arg1, arg2) {

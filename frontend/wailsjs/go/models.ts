@@ -309,6 +309,7 @@ export namespace types {
 	    id: number;
 	    project_id: number;
 	    jira_ticket_id: string;
+	    jira_title: string;
 	    title: string;
 	    description: string;
 	    scheduled_date?: time.Time;
@@ -326,6 +327,7 @@ export namespace types {
 	        this.id = source["id"];
 	        this.project_id = source["project_id"];
 	        this.jira_ticket_id = source["jira_ticket_id"];
+	        this.jira_title = source["jira_title"];
 	        this.title = source["title"];
 	        this.description = source["description"];
 	        this.scheduled_date = this.convertValues(source["scheduled_date"], time.Time);
@@ -357,6 +359,7 @@ export namespace types {
 	    id: number;
 	    project_id: number;
 	    jira_ticket_id: string;
+	    jira_title: string;
 	    title: string;
 	    description: string;
 	    scheduled_date?: time.Time;
@@ -375,6 +378,7 @@ export namespace types {
 	        this.id = source["id"];
 	        this.project_id = source["project_id"];
 	        this.jira_ticket_id = source["jira_ticket_id"];
+	        this.jira_title = source["jira_title"];
 	        this.title = source["title"];
 	        this.description = source["description"];
 	        this.scheduled_date = this.convertValues(source["scheduled_date"], time.Time);

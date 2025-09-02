@@ -18,8 +18,8 @@ func NewTaskModel(db *sql.DB) *TaskModel {
 
 func (m *TaskModel) Create(task *types.Task) error {
 	query := `
-		INSERT INTO tasks (project_id, jira_ticket_id, title, description, scheduled_date, deadline, status, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO tasks (project_id, jira_ticket_id, jira_title, title, description, scheduled_date, deadline, status, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 	now := time.Now()
 	task.CreatedAt = now
@@ -28,7 +28,7 @@ func (m *TaskModel) Create(task *types.Task) error {
 		task.Status = types.TaskPending
 	}
 
-	result, err := m.db.Exec(query, task.ProjectID, task.JiraTicketID, task.Title, task.Description, task.ScheduledDate, task.Deadline, task.Status, task.CreatedAt, task.UpdatedAt)
+	result, err := m.db.Exec(query, task.ProjectID, task.JiraTicketID, task.JiraTitle, task.Title, task.Description, task.ScheduledDate, task.Deadline, task.Status, task.CreatedAt, task.UpdatedAt)
 	if err != nil {
 		return fmt.Errorf("failed to create task: %w", err)
 	}
@@ -44,7 +44,7 @@ func (m *TaskModel) Create(task *types.Task) error {
 
 func (m *TaskModel) GetByID(id int64) (*types.Task, error) {
 	query := `
-		SELECT id, project_id, jira_ticket_id, title, description, scheduled_date, deadline, status, created_at, updated_at
+		SELECT id, project_id, jira_ticket_id, jira_title, title, description, scheduled_date, deadline, status, created_at, updated_at
 		FROM tasks
 		WHERE id = ?
 	`
@@ -54,6 +54,7 @@ func (m *TaskModel) GetByID(id int64) (*types.Task, error) {
 		&task.ID,
 		&task.ProjectID,
 		&task.JiraTicketID,
+		&task.JiraTitle,
 		&task.Title,
 		&task.Description,
 		&task.ScheduledDate,
@@ -71,7 +72,7 @@ func (m *TaskModel) GetByID(id int64) (*types.Task, error) {
 
 func (m *TaskModel) GetByProjectID(projectID int64) ([]*types.Task, error) {
 	query := `
-		SELECT id, project_id, jira_ticket_id, title, description, scheduled_date, deadline, status, created_at, updated_at
+		SELECT id, project_id, jira_ticket_id, jira_title, title, description, scheduled_date, deadline, status, created_at, updated_at
 		FROM tasks
 		WHERE project_id = ?
 		ORDER BY 
@@ -93,6 +94,7 @@ func (m *TaskModel) GetByProjectID(projectID int64) ([]*types.Task, error) {
 			&task.ID,
 			&task.ProjectID,
 			&task.JiraTicketID,
+			&task.JiraTitle,
 			&task.Title,
 			&task.Description,
 			&task.ScheduledDate,
@@ -112,7 +114,7 @@ func (m *TaskModel) GetByProjectID(projectID int64) ([]*types.Task, error) {
 
 func (m *TaskModel) GetAllWithProjects() ([]*types.TaskWithProject, error) {
 	query := `
-		SELECT t.id, t.project_id, t.jira_ticket_id, t.title, t.description, t.scheduled_date, t.deadline, t.status, t.created_at, t.updated_at, p.name
+		SELECT t.id, t.project_id, t.jira_ticket_id, t.jira_title, t.title, t.description, t.scheduled_date, t.deadline, t.status, t.created_at, t.updated_at, p.name
 		FROM tasks t
 		JOIN projects p ON t.project_id = p.id
 		ORDER BY t.deadline ASC
@@ -131,8 +133,10 @@ func (m *TaskModel) GetAllWithProjects() ([]*types.TaskWithProject, error) {
 			&task.ID,
 			&task.ProjectID,
 			&task.JiraTicketID,
+			&task.JiraTitle,
 			&task.Title,
 			&task.Description,
+			&task.ScheduledDate,
 			&task.Deadline,
 			&task.Status,
 			&task.CreatedAt,
@@ -150,7 +154,7 @@ func (m *TaskModel) GetAllWithProjects() ([]*types.TaskWithProject, error) {
 
 func (m *TaskModel) GetTasksInDateRange(startDate, endDate time.Time) ([]*types.TaskWithProject, error) {
 	query := `
-		SELECT t.id, t.project_id, t.jira_ticket_id, t.title, t.description, t.scheduled_date, t.deadline, t.status, t.created_at, t.updated_at, p.name
+		SELECT t.id, t.project_id, t.jira_ticket_id, t.jira_title, t.title, t.description, t.scheduled_date, t.deadline, t.status, t.created_at, t.updated_at, p.name
 		FROM tasks t
 		JOIN projects p ON t.project_id = p.id
 		WHERE t.deadline BETWEEN ? AND ?
@@ -170,8 +174,10 @@ func (m *TaskModel) GetTasksInDateRange(startDate, endDate time.Time) ([]*types.
 			&task.ID,
 			&task.ProjectID,
 			&task.JiraTicketID,
+			&task.JiraTitle,
 			&task.Title,
 			&task.Description,
+			&task.ScheduledDate,
 			&task.Deadline,
 			&task.Status,
 			&task.CreatedAt,
@@ -190,12 +196,12 @@ func (m *TaskModel) GetTasksInDateRange(startDate, endDate time.Time) ([]*types.
 func (m *TaskModel) Update(task *types.Task) error {
 	query := `
 		UPDATE tasks
-		SET project_id = ?, jira_ticket_id = ?, title = ?, description = ?, scheduled_date = ?, deadline = ?, status = ?, updated_at = ?
+		SET project_id = ?, jira_ticket_id = ?, jira_title = ?, title = ?, description = ?, scheduled_date = ?, deadline = ?, status = ?, updated_at = ?
 		WHERE id = ?
 	`
 	
 	task.UpdatedAt = time.Now()
-	_, err := m.db.Exec(query, task.ProjectID, task.JiraTicketID, task.Title, task.Description, task.ScheduledDate, task.Deadline, task.Status, task.UpdatedAt, task.ID)
+	_, err := m.db.Exec(query, task.ProjectID, task.JiraTicketID, task.JiraTitle, task.Title, task.Description, task.ScheduledDate, task.Deadline, task.Status, task.UpdatedAt, task.ID)
 	if err != nil {
 		return fmt.Errorf("failed to update task: %w", err)
 	}
@@ -219,9 +225,25 @@ func (m *TaskModel) UpdateStatus(id int64, status types.TaskStatus) error {
 	return nil
 }
 
+func (m *TaskModel) UpdateJiraTitle(id int64, jiraTitle string) error {
+	query := `
+		UPDATE tasks
+		SET jira_title = ?, updated_at = ?
+		WHERE id = ?
+	`
+	
+	now := time.Now()
+	_, err := m.db.Exec(query, jiraTitle, now, id)
+	if err != nil {
+		return fmt.Errorf("failed to update JIRA title: %w", err)
+	}
+
+	return nil
+}
+
 func (m *TaskModel) GetTasksGroupedByScheduledDate() ([]*types.TaskWithProject, error) {
 	query := `
-		SELECT t.id, t.project_id, t.jira_ticket_id, t.title, t.description, t.scheduled_date, t.deadline, t.status, t.created_at, t.updated_at, p.name
+		SELECT t.id, t.project_id, t.jira_ticket_id, t.jira_title, t.title, t.description, t.scheduled_date, t.deadline, t.status, t.created_at, t.updated_at, p.name
 		FROM tasks t
 		JOIN projects p ON t.project_id = p.id
 		ORDER BY 
@@ -243,6 +265,7 @@ func (m *TaskModel) GetTasksGroupedByScheduledDate() ([]*types.TaskWithProject, 
 			&task.ID,
 			&task.ProjectID,
 			&task.JiraTicketID,
+			&task.JiraTitle,
 			&task.Title,
 			&task.Description,
 			&task.ScheduledDate,

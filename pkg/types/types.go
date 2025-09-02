@@ -93,6 +93,7 @@ type Task struct {
 	ID            int64      `json:"id" db:"id"`
 	ProjectID     int64      `json:"project_id" db:"project_id"`
 	JiraTicketID  string     `json:"jira_ticket_id" db:"jira_ticket_id"`
+	JiraTitle     string     `json:"jira_title" db:"jira_title"`
 	Title         string     `json:"title" db:"title"`
 	Description   string     `json:"description" db:"description"`
 	ScheduledDate *time.Time `json:"scheduled_date" db:"scheduled_date"`
