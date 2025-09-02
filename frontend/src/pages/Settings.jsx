@@ -5,7 +5,9 @@ import { Save, TestTube, RefreshCw, CheckCircle, XCircle, Settings as SettingsIc
 const Settings = () => {
   const [config, setConfig] = useState({
     jira_url: '',
-    jira_token: ''
+    jira_username: '',
+    jira_token: '',
+    jira_auth_method: 'basic'
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -24,7 +26,9 @@ const Settings = () => {
       const configData = await GetAllConfig();
       setConfig({
         jira_url: configData.jira_url || '',
-        jira_token: configData.jira_token || ''
+        jira_username: configData.jira_username || '',
+        jira_token: configData.jira_token || '',
+        jira_auth_method: configData.jira_auth_method || 'basic'
       });
     } catch (err) {
       console.error('Failed to load config:', err);
@@ -56,7 +60,9 @@ const Settings = () => {
     setSaving(true);
     try {
       await SetConfig('jira_url', config.jira_url);
+      await SetConfig('jira_username', config.jira_username);
       await SetConfig('jira_token', config.jira_token);
+      await SetConfig('jira_auth_method', config.jira_auth_method);
       showMessage('Configuration saved successfully!', 'success');
     } catch (err) {
       console.error('Failed to save config:', err);
@@ -68,7 +74,12 @@ const Settings = () => {
 
   const handleTestConnection = async () => {
     if (!config.jira_url || !config.jira_token) {
-      showMessage('Please enter both JIRA URL and token before testing', 'error');
+      showMessage('Please enter JIRA URL and credentials before testing', 'error');
+      return;
+    }
+    
+    if (config.jira_auth_method === 'basic' && !config.jira_username) {
+      showMessage('Username is required for Basic authentication', 'error');
       return;
     }
 
@@ -90,6 +101,11 @@ const Settings = () => {
   const handleRefreshTitles = async () => {
     if (!config.jira_url || !config.jira_token) {
       showMessage('Please configure and test JIRA connection first', 'error');
+      return;
+    }
+    
+    if (config.jira_auth_method === 'basic' && !config.jira_username) {
+      showMessage('Please complete JIRA configuration first', 'error');
       return;
     }
 
@@ -151,7 +167,7 @@ const Settings = () => {
         <div className="p-6 space-y-6">
           <div>
             <label htmlFor="jira_url" className="block text-sm font-medium text-gray-700 mb-2">
-              JIRA Base URL
+              JIRA Base URL *
             </label>
             <input
               type="url"
@@ -160,17 +176,58 @@ const Settings = () => {
               value={config.jira_url}
               onChange={handleInputChange}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="https://your-domain.atlassian.net"
+              placeholder="https://your-company-jira.com"
               disabled={saving}
             />
             <p className="text-xs text-gray-500 mt-1">
-              Your JIRA instance URL (e.g., https://company.atlassian.net)
+              Your JIRA instance URL (e.g., https://company.atlassian.net or https://jira.company.com)
             </p>
           </div>
 
           <div>
+            <label htmlFor="jira_auth_method" className="block text-sm font-medium text-gray-700 mb-2">
+              Authentication Method
+            </label>
+            <select
+              id="jira_auth_method"
+              name="jira_auth_method"
+              value={config.jira_auth_method}
+              onChange={handleInputChange}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              disabled={saving}
+            >
+              <option value="basic">Basic Authentication (Username + Password/Token)</option>
+              <option value="bearer">Bearer Token (API Token)</option>
+            </select>
+            <p className="text-xs text-gray-500 mt-1">
+              Enterprise JIRA typically uses Basic Authentication
+            </p>
+          </div>
+
+          {config.jira_auth_method === 'basic' && (
+            <div>
+              <label htmlFor="jira_username" className="block text-sm font-medium text-gray-700 mb-2">
+                JIRA Username *
+              </label>
+              <input
+                type="text"
+                id="jira_username"
+                name="jira_username"
+                value={config.jira_username}
+                onChange={handleInputChange}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="your.username"
+                disabled={saving}
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Your JIRA username (required for Basic authentication)
+              </p>
+            </div>
+          )}
+
+          <div>
             <label htmlFor="jira_token" className="block text-sm font-medium text-gray-700 mb-2">
-              JIRA Personal Access Token
+              {config.jira_auth_method === 'basic' ? 'Password or API Token *' : 'API Token *'}
             </label>
             <input
               type="password"
@@ -179,11 +236,14 @@ const Settings = () => {
               value={config.jira_token}
               onChange={handleInputChange}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="Your JIRA API token"
+              placeholder={config.jira_auth_method === 'basic' ? 'Your password or API token' : 'Your API token'}
               disabled={saving}
             />
             <p className="text-xs text-gray-500 mt-1">
-              Create a token at: JIRA → Profile → Personal Access Tokens → Create token
+              {config.jira_auth_method === 'basic' 
+                ? 'Your JIRA password or Personal Access Token'
+                : 'Create a token at: JIRA → Profile → Personal Access Tokens → Create token'
+              }
             </p>
           </div>
 
@@ -203,7 +263,7 @@ const Settings = () => {
 
             <button
               onClick={handleTestConnection}
-              disabled={testing || !config.jira_url || !config.jira_token}
+              disabled={testing || !config.jira_url || !config.jira_token || (config.jira_auth_method === 'basic' && !config.jira_username)}
               className="flex items-center gap-2 px-4 py-2 border border-green-600 text-green-600 rounded-lg hover:bg-green-50 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {testing ? (
@@ -216,7 +276,7 @@ const Settings = () => {
 
             <button
               onClick={handleRefreshTitles}
-              disabled={refreshing || !config.jira_url || !config.jira_token}
+              disabled={refreshing || !config.jira_url || !config.jira_token || (config.jira_auth_method === 'basic' && !config.jira_username)}
               className="flex items-center gap-2 px-4 py-2 border border-purple-600 text-purple-600 rounded-lg hover:bg-purple-50 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {refreshing ? (
@@ -230,14 +290,30 @@ const Settings = () => {
 
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
             <h3 className="font-medium text-blue-900 mb-2">How to set up JIRA integration:</h3>
-            <ol className="text-sm text-blue-800 space-y-1 list-decimal list-inside">
-              <li>Go to your JIRA instance (e.g., https://company.atlassian.net)</li>
-              <li>Click your profile picture → Profile → Personal Access Tokens</li>
-              <li>Create a new token with appropriate permissions (read access to issues)</li>
-              <li>Copy the token and paste it above</li>
-              <li>Enter your JIRA base URL and save the configuration</li>
-              <li>Test the connection to verify everything works</li>
-            </ol>
+            
+            <div className="space-y-4">
+              <div>
+                <h4 className="font-medium text-blue-900 mb-1">For Enterprise JIRA (v9.x):</h4>
+                <ol className="text-sm text-blue-800 space-y-1 list-decimal list-inside ml-2">
+                  <li>Enter your JIRA base URL (e.g., https://jira.company.com)</li>
+                  <li>Select "Basic Authentication"</li>
+                  <li>Enter your JIRA username</li>
+                  <li>Use your regular password or create a Personal Access Token</li>
+                  <li>Test the connection to verify everything works</li>
+                </ol>
+              </div>
+              
+              <div>
+                <h4 className="font-medium text-blue-900 mb-1">For Atlassian Cloud JIRA:</h4>
+                <ol className="text-sm text-blue-800 space-y-1 list-decimal list-inside ml-2">
+                  <li>Enter your JIRA URL (e.g., https://company.atlassian.net)</li>
+                  <li>Select "Bearer Token" authentication</li>
+                  <li>Go to: Profile → Personal Access Tokens → Create token</li>
+                  <li>Copy the token and paste it in the token field</li>
+                  <li>Test the connection to verify everything works</li>
+                </ol>
+              </div>
+            </div>
           </div>
         </div>
       </div>

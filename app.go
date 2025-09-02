@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"gh-dashboard/internal/database"
@@ -392,7 +393,7 @@ func (a *App) SetConfig(key, value string) error {
 	}
 	
 	// Reinitialize JIRA client if JIRA config was changed
-	if key == "jira_url" || key == "jira_token" {
+	if strings.HasPrefix(key, "jira_") {
 		a.initJiraClient()
 	}
 	
@@ -415,10 +416,20 @@ func (a *App) initJiraClient() {
 	
 	jiraURL, _ := a.configModel.Get("jira_url")
 	jiraToken, _ := a.configModel.Get("jira_token")
+	jiraUsername, _ := a.configModel.Get("jira_username")
+	jiraAuthMethod, _ := a.configModel.Get("jira_auth_method")
 	
-	if jiraURL != nil && jiraToken != nil && jiraURL.Value != "" && jiraToken.Value != "" {
-		a.jiraClient = jira.NewClient(jiraURL.Value, jiraToken.Value)
-		log.Println("JIRA client initialized")
+	if jiraURL != nil && jiraURL.Value != "" && jiraToken != nil && jiraToken.Value != "" {
+		var username, authMethod string
+		if jiraUsername != nil {
+			username = jiraUsername.Value
+		}
+		if jiraAuthMethod != nil {
+			authMethod = jiraAuthMethod.Value
+		}
+		
+		a.jiraClient = jira.NewClientWithAuth(jiraURL.Value, username, jiraToken.Value, authMethod)
+		log.Printf("JIRA client initialized with auth method: %s", authMethod)
 	}
 }
 
