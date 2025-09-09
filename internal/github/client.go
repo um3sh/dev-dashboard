@@ -354,34 +354,46 @@ func (c *Client) ScanKustomizationFilesInPath(ctx context.Context, owner, repo, 
 		log.Printf("Processing kustomization file: %s", path)
 		
 		// Parse service name, environment, region, and namespace from path
-		// Expected patterns:
-		// - services/service-b/overlays/prd/us-west-2/ns-a/kustomization.yaml (default)
-		// - k8s/service-b/overlays/prd/us-west-2/ns-a/kustomization.yaml (custom root)
-		// - rootpath/service-b/overlays/prd/us-west-2/ns-a/kustomization.yaml (custom root)
+		// Expected patterns with flexible overlay directory names:
+		// - services/service-b/overlays/prd/us-west-2/ns-a/kustomization.yaml (standard)
+		// - services/service-b/overlays-argo/prd/us-west-2/ns-a/kustomization.yaml (argo-specific)
+		// - k8s/service-b/overlay/prd/us-west-2/ns-a/kustomization.yaml (singular form)
+		// - rootpath/service-b/envs/prd/us-west-2/ns-a/kustomization.yaml (environments)
+		// - rootpath/service-b/overlays-custom/prd/us-west-2/ns-a/kustomization.yaml (custom prefix)
 		pathParts := strings.Split(path, "/")
 		
 		// Find the overlays directory to determine the structure
+		// Support multiple overlay directory naming conventions
 		overlaysIndex := -1
+		overlaysName := ""
+		overlaysPatterns := []string{"overlays", "overlays-argo", "overlay", "envs", "environments"}
+		
 		for i, part := range pathParts {
-			if part == "overlays" {
-				overlaysIndex = i
+			for _, pattern := range overlaysPatterns {
+				if part == pattern || strings.HasPrefix(part, "overlays-") {
+					overlaysIndex = i
+					overlaysName = part
+					break
+				}
+			}
+			if overlaysIndex != -1 {
 				break
 			}
 		}
 		
-		// We need at least: [root]/service/overlays/env/region/namespace/kustomization.yaml
-		// That's minimum 6 parts after finding overlays
+		// We need at least: [root]/service/{overlays-dir}/env/region/namespace/kustomization.yaml
+		// That's minimum 6 parts after finding the overlay directory
 		if overlaysIndex < 1 || len(pathParts) < overlaysIndex + 4 {
-			log.Printf("Skipping kustomization file with unexpected path structure: %s", path)
+			log.Printf("Skipping kustomization file with unexpected path structure: %s (no valid overlay directory found)", path)
 			continue
 		}
 
-		serviceName := pathParts[overlaysIndex-1]  // Service is the directory before overlays
-		environment := pathParts[overlaysIndex+1]  // Environment is after overlays
+		serviceName := pathParts[overlaysIndex-1]  // Service is the directory before the overlay dir
+		environment := pathParts[overlaysIndex+1]  // Environment is after the overlay dir
 		region := pathParts[overlaysIndex+2]       // Region is after environment
 		namespace := pathParts[overlaysIndex+3]    // Namespace is after region
 		
-		log.Printf("Parsed kustomization: service=%s, env=%s, region=%s, namespace=%s", serviceName, environment, region, namespace)
+		log.Printf("Parsed kustomization: service=%s, overlay-dir=%s, env=%s, region=%s, namespace=%s", serviceName, overlaysName, environment, region, namespace)
 
 		// Get the content of the kustomization.yaml file
 		fileContent, _, _, err := c.gh.Repositories.GetContents(ctx, owner, repo, path, nil)
