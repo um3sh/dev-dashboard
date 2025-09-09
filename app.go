@@ -453,8 +453,13 @@ func (a *App) GetServicePullRequests(serviceID int64) ([]*types.PullRequest, err
 	client := a.createGitHubClient(githubToken)
 	
 	// Parse repository URL to get owner and repo name
-	owner, repoName := parseRepositoryURL(repo.URL)
+	owner, repoName, err := a.parseGitHubURL(repo.URL)
+	if err != nil {
+		log.Printf("Failed to parse repository URL %s: %v", repo.URL, err)
+		return []*types.PullRequest{}, nil
+	}
 	if owner == "" || repoName == "" {
+		log.Printf("Empty owner or repo name for URL %s", repo.URL)
 		return []*types.PullRequest{}, nil
 	}
 	
@@ -561,8 +566,13 @@ func (a *App) GetServiceCommits(serviceID int64) ([]*types.Commit, error) {
 	client := a.createGitHubClient(githubToken)
 	
 	// Parse repository URL to get owner and repo name
-	owner, repoName := parseRepositoryURL(repo.URL)
+	owner, repoName, err := a.parseGitHubURL(repo.URL)
+	if err != nil {
+		log.Printf("Failed to parse repository URL %s: %v", repo.URL, err)
+		return []*types.Commit{}, nil
+	}
 	if owner == "" || repoName == "" {
+		log.Printf("Empty owner or repo name for URL %s", repo.URL)
 		return []*types.Commit{}, nil
 	}
 	
@@ -1344,34 +1354,6 @@ func (a *App) isKubernetesRepository(repo *types.Repository) bool {
 	return false
 }
 
-// parseRepositoryURL extracts owner and repo name from GitHub repository URL
-func parseRepositoryURL(url string) (string, string) {
-	// Handle both SSH and HTTPS URLs
-	// SSH: git@github.com:owner/repo.git
-	// HTTPS: https://github.com/owner/repo or https://github.com/owner/repo.git
-	
-	url = strings.TrimSuffix(url, ".git")
-	
-	if strings.HasPrefix(url, "git@github.com:") {
-		// SSH format
-		parts := strings.Split(strings.TrimPrefix(url, "git@github.com:"), "/")
-		if len(parts) == 2 {
-			return parts[0], parts[1]
-		}
-	} else if strings.Contains(url, "github.com/") {
-		// HTTPS format
-		idx := strings.Index(url, "github.com/")
-		if idx >= 0 {
-			remaining := url[idx+len("github.com/"):]
-			parts := strings.Split(remaining, "/")
-			if len(parts) >= 2 {
-				return parts[0], parts[1]
-			}
-		}
-	}
-	
-	return "", ""
-}
 
 // getGitHubToken retrieves the GitHub token from config, falling back to environment variable
 func (a *App) getGitHubToken() string {
