@@ -115,6 +115,7 @@ export GITHUB_TOKEN=your_github_personal_access_token
 ### Repository Management
 - Add monorepo and Kubernetes resource repositories via HTTPS URLs
 - Specify custom service name and location for monorepos
+- Specify root path for Kubernetes resource repositories (optional)
 - GitHub Personal Access Token authentication for private repositories
 - Automatic service/resource discovery
 - Manual and automatic sync with GitHub
@@ -125,7 +126,8 @@ export GITHUB_TOKEN=your_github_personal_access_token
 - Shows recent activity and status
 
 ### Kubernetes Resources
-- Discovers YAML files in common K8s directories
+- Discovers YAML files in common K8s directories (k8s/, kubernetes/, manifests/, deployment/, overlays/)
+- Optional root path specification for repositories with non-standard structures
 - Tracks deployment PR creation and overlay updates
 - Organizes by namespace
 
@@ -168,6 +170,22 @@ export GITHUB_TOKEN=your_github_personal_access_token
 - Use Enterprise Personal Access Token (ghs_xxx or ghp_xxx depending on version)
 - Access your organization's repositories and resources
 - Supports all standard GitHub API features
+
+### Repository Configuration
+
+**Monorepo Repositories:**
+- **Service Location** (required): Specify the directory where services are located (e.g., `services/`, `apps/`, `microservices/`)
+- The application will scan this directory for subdirectories representing individual services
+- Each subdirectory becomes a tracked microservice
+
+**Kubernetes Resource Repositories:**
+- **Root Path** (optional): Specify a directory containing Kubernetes manifests
+- Leave empty to automatically scan common directories: `k8s/`, `kubernetes/`, `manifests/`, `deployment/`, `overlays/`
+- Examples of custom root paths:
+  - `infrastructure/k8s/` - if your Kubernetes files are in a subdirectory
+  - `deploy/` - for repositories with deployment-specific directory structure
+  - `cluster-configs/` - for cluster configuration repositories
+- The application will recursively scan the specified path for `.yaml` and `.yml` files
 
 ### Development vs Production
 - Development (`wails dev`): Hot reloading enabled, may show browser option but runs as desktop app

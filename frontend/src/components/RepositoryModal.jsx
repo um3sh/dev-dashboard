@@ -304,6 +304,32 @@ const RepositoryModal = ({ onClose, onRepositoryCreated }) => {
                   </p>
                 </div>
               )}
+
+              {formData.type === 'kubernetes' && (
+                <div>
+                  <label htmlFor="serviceLocation" className="block text-sm font-medium text-gray-700 mb-1">
+                    Root Path (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    id="serviceLocation"
+                    name="serviceLocation"
+                    value={formData.serviceLocation}
+                    onChange={handleInputChange}
+                    className={`w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                      errors.serviceLocation ? 'border-red-500' : 'border-gray-300'
+                    }`}
+                    placeholder="e.g., k8s/, kubernetes/, manifests/, deployment/"
+                    disabled={isSubmitting}
+                  />
+                  {errors.serviceLocation && (
+                    <p className="text-red-500 text-sm mt-1">{errors.serviceLocation}</p>
+                  )}
+                  <p className="text-xs text-gray-500 mt-1">
+                    Directory path where Kubernetes resources are located. Leave empty to scan common directories (k8s/, kubernetes/, manifests/, etc.)
+                  </p>
+                </div>
+              )}
             </div>
 
             {/* Authentication Method */}

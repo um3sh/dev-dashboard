@@ -238,7 +238,14 @@ func (s *Service) syncKubernetesRepo(repo *types.Repository, owner, repoName str
 	}
 
 	// Discover Kubernetes resources
-	resources, err := s.githubClient.DiscoverKubernetesResources(s.ctx, owner, repoName)
+	rootPath := repo.ServiceLocation // Use service_location as root path for Kubernetes repos too
+	if rootPath == "" {
+		log.Printf("No root path specified for Kubernetes repository %s, using default discovery", repo.Name)
+	} else {
+		log.Printf("Using root path '%s' for Kubernetes repository %s", rootPath, repo.Name)
+	}
+	
+	resources, err := s.githubClient.DiscoverKubernetesResourcesInPath(s.ctx, owner, repoName, rootPath)
 	if err != nil {
 		return fmt.Errorf("failed to discover kubernetes resources: %w", err)
 	}

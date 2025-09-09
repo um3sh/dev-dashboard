@@ -143,17 +143,30 @@ func (c *Client) DiscoverMicroservicesInPath(ctx context.Context, owner, repo, s
 }
 
 func (c *Client) DiscoverKubernetesResources(ctx context.Context, owner, repo string) ([]ResourceInfo, error) {
+	return c.DiscoverKubernetesResourcesInPath(ctx, owner, repo, "")
+}
+
+func (c *Client) DiscoverKubernetesResourcesInPath(ctx context.Context, owner, repo, rootPath string) ([]ResourceInfo, error) {
 	var resources []ResourceInfo
 
-	// Common Kubernetes directories to check
-	kubeDirs := []string{"k8s", "kubernetes", "manifests", "deployment", "overlays"}
-
-	for _, dir := range kubeDirs {
-		dirResources, err := c.discoverResourcesInDir(ctx, owner, repo, dir, "")
+	if rootPath != "" && rootPath != "." {
+		// If a specific root path is provided, scan that directory and its subdirectories
+		dirResources, err := c.discoverResourcesInDir(ctx, owner, repo, strings.TrimPrefix(rootPath, "/"), "")
 		if err != nil {
-			continue // Skip if directory doesn't exist
+			return resources, fmt.Errorf("failed to scan root path %s: %w", rootPath, err)
 		}
 		resources = append(resources, dirResources...)
+	} else {
+		// No root path specified, use default behavior to check common Kubernetes directories
+		kubeDirs := []string{"k8s", "kubernetes", "manifests", "deployment", "overlays"}
+
+		for _, dir := range kubeDirs {
+			dirResources, err := c.discoverResourcesInDir(ctx, owner, repo, dir, "")
+			if err != nil {
+				continue // Skip if directory doesn't exist
+			}
+			resources = append(resources, dirResources...)
+		}
 	}
 
 	return resources, nil
