@@ -107,3 +107,58 @@ type TaskWithProject struct {
 	Task
 	ProjectName string `json:"project_name"`
 }
+
+type PullRequest struct {
+	ID        int64     `json:"id"`
+	Number    int       `json:"number"`
+	Title     string    `json:"title"`
+	Status    string    `json:"status"`
+	Author    string    `json:"author"`
+	Branch    string    `json:"branch"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+type Commit struct {
+	Hash    string    `json:"hash"`
+	Message string    `json:"message"`
+	Author  string    `json:"author"`
+	Date    time.Time `json:"date"`
+}
+
+type Deployment struct {
+	ID                int64     `json:"id" db:"id"`
+	ServiceID         int64     `json:"service_id" db:"service_id"`
+	KubernetesRepoID  int64     `json:"kubernetes_repo_id" db:"kubernetes_repo_id"`
+	CommitSHA         string    `json:"commit_sha" db:"commit_sha"`
+	Environment       string    `json:"environment" db:"environment"`
+	Region            string    `json:"region" db:"region"`
+	Namespace         string    `json:"namespace" db:"namespace"`
+	Tag               string    `json:"tag" db:"tag"`
+	Path              string    `json:"path" db:"path"`
+	DiscoveredAt      time.Time `json:"discovered_at" db:"discovered_at"`
+	UpdatedAt         time.Time `json:"updated_at" db:"updated_at"`
+}
+
+type DeploymentOverview struct {
+	CommitSHA            string    `json:"commit_sha"`
+	Environment          string    `json:"environment"`
+	Region               string    `json:"region"`
+	Namespace            string    `json:"namespace"`
+	Tag                  string    `json:"tag"`
+	UpdatedAt            time.Time `json:"updated_at"`
+	KubernetesRepoName   string    `json:"kubernetes_repo_name"`
+}
+
+type DeploymentStatus struct {
+	Environment  string    `json:"environment"`
+	Region       string    `json:"region"`
+	Namespace    string    `json:"namespace"`
+	Tag          string    `json:"tag"`
+	IsDeployed   bool      `json:"is_deployed"`
+	DeployedAt   time.Time `json:"deployed_at"`
+}
+
+type CommitDeploymentStatus struct {
+	Commit        Commit             `json:"commit"`
+	Deployments   []DeploymentStatus `json:"deployments"`
+}

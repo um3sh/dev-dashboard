@@ -17,7 +17,7 @@ func main() {
 
 	// Create application with options
 	err := wails.Run(&options.App{
-		Title:  "GitHub Dashboard",
+		Title:  "Dev Dashboard",
 		Width:  1200,
 		Height: 800,
 		MinWidth:  800,

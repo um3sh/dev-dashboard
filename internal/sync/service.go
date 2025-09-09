@@ -5,48 +5,48 @@ import (
 	"fmt"
 	"log"
 	"net/url"
+	"regexp"
 	"strings"
 	"time"
 
-	"gh-dashboard/internal/github"
-	"gh-dashboard/internal/models"
-	"gh-dashboard/pkg/types"
+	"dev-dashboard/internal/github"
+	"dev-dashboard/internal/kubernetes"
+	"dev-dashboard/internal/models"
+	"dev-dashboard/pkg/types"
+	
+	goGithub "github.com/google/go-github/v57/github"
 )
 
 type Service struct {
 	githubClient        *github.Client
-	sshClient          *github.SSHClient
 	repoModel          *models.RepositoryModel
 	microserviceModel  *models.MicroserviceModel
 	kubernetesModel    *models.KubernetesResourceModel
 	actionModel        *models.ActionModel
+	deploymentModel    *models.DeploymentModel
+	kubernetesScanner  *kubernetes.Scanner
 	syncInterval       time.Duration
 	ctx                context.Context
 	cancelFunc         context.CancelFunc
 }
 
 type Config struct {
-	GitHubToken  string
-	SSHKeyPath   string
-	SyncInterval time.Duration
+	GitHubToken       string
+	GitHubEnterpriseURL string
+	SyncInterval      time.Duration
 }
 
-func NewService(config Config, repoModel *models.RepositoryModel, microserviceModel *models.MicroserviceModel, kubernetesModel *models.KubernetesResourceModel, actionModel *models.ActionModel) *Service {
+func NewService(config Config, repoModel *models.RepositoryModel, microserviceModel *models.MicroserviceModel, kubernetesModel *models.KubernetesResourceModel, actionModel *models.ActionModel, deploymentModel *models.DeploymentModel) *Service {
 	ctx, cancel := context.WithCancel(context.Background())
 	
-	// Initialize SSH client
-	sshClient, err := github.NewSSHClient(config.GitHubToken, config.SSHKeyPath)
-	if err != nil {
-		log.Printf("Warning: Failed to initialize SSH client: %v", err)
-	}
-	
 	return &Service{
-		githubClient:       github.NewClient(config.GitHubToken),
-		sshClient:         sshClient,
+		githubClient:       github.NewClientWithBaseURL(config.GitHubToken, config.GitHubEnterpriseURL),
 		repoModel:         repoModel,
 		microserviceModel: microserviceModel,
 		kubernetesModel:   kubernetesModel,
 		actionModel:       actionModel,
+		deploymentModel:   deploymentModel,
+		kubernetesScanner: kubernetes.NewScanner(),
 		syncInterval:      config.SyncInterval,
 		ctx:               ctx,
 		cancelFunc:        cancel,
@@ -120,10 +120,8 @@ func (s *Service) syncMonorepo(repo *types.Repository, owner, repoName string) e
 	var services []github.ServiceInfo
 	var err error
 
-	// Use SSH client if available, otherwise fall back to GitHub API client
-	if s.sshClient != nil {
-		services, err = s.sshClient.DiscoverMicroservices(s.ctx, repo.URL, repo.ServiceName, repo.ServiceLocation)
-	} else if s.githubClient != nil {
+	// Use GitHub API client for service discovery
+	if s.githubClient != nil {
 		services, err = s.githubClient.DiscoverMicroservices(s.ctx, owner, repoName)
 	} else {
 		return fmt.Errorf("no GitHub client available")
@@ -153,8 +151,8 @@ func (s *Service) syncMonorepo(repo *types.Repository, owner, repoName string) e
 		})
 	}
 
-	// Upsert microservices
-	if err := s.microserviceModel.UpsertServices(repo.ID, microservices); err != nil {
+	// Upsert microservices preserving existing IDs
+	if err := s.microserviceModel.UpsertServicesPreserveID(repo.ID, microservices); err != nil {
 		return fmt.Errorf("failed to upsert microservices: %w", err)
 	}
 
@@ -167,6 +165,78 @@ func (s *Service) syncMonorepo(repo *types.Repository, owner, repoName string) e
 }
 
 func (s *Service) syncKubernetesRepo(repo *types.Repository, owner, repoName string) error {
+	// Scan for real deployment data using GitHub API
+	if s.githubClient != nil {
+		log.Printf("Scanning kustomization files for Kubernetes repo: %s", repo.Name)
+		
+		// Use GitHub API to scan for kustomization.yaml files
+		kustomizationDeployments, err := s.githubClient.ScanKustomizationFiles(s.ctx, owner, repoName)
+		if err != nil {
+			log.Printf("Failed to scan kustomization files in %s: %v", repo.Name, err)
+		} else {
+			log.Printf("Found %d kustomization deployments in %s", len(kustomizationDeployments), repo.Name)
+			
+			// Get all microservices to match with deployments
+			allServices, err := s.microserviceModel.GetAll()
+			if err != nil {
+				log.Printf("Failed to get services for deployment matching: %v", err)
+			} else {
+				// Convert GitHub API results to deployment records
+				for _, kustomDeploy := range kustomizationDeployments {
+					// Find matching service by name
+					var serviceID int64
+					for _, service := range allServices {
+						if strings.Contains(strings.ToLower(service.Name), strings.ToLower(kustomDeploy.ServiceName)) ||
+						   strings.Contains(strings.ToLower(kustomDeploy.ServiceName), strings.ToLower(service.Name)) {
+							serviceID = service.ID
+							break
+						}
+					}
+					
+					if serviceID == 0 {
+						log.Printf("No matching service found for %s, skipping", kustomDeploy.ServiceName)
+						continue
+					}
+					
+					// Try to correlate tag with actual monorepo commit
+					var commitSHA string
+					// Check if tag is already a commit SHA (40 hex characters)
+					if len(kustomDeploy.Tag) == 40 && isHexString(kustomDeploy.Tag) {
+						// Tag is likely a commit SHA, use it directly
+						commitSHA = kustomDeploy.Tag
+						log.Printf("Using tag as commit SHA for service %s: %s", kustomDeploy.ServiceName, kustomDeploy.Tag)
+					} else {
+						// Try to correlate tag with actual monorepo commit
+						commitSHA = s.correlateTagWithCommit(serviceID, kustomDeploy.Tag)
+						if commitSHA == "" {
+							commitSHA = kustomDeploy.CommitSHA // Fallback to k8s repo commit
+						}
+					}
+
+					deployment := &types.Deployment{
+						ServiceID:        serviceID,
+						KubernetesRepoID: repo.ID,
+						CommitSHA:        commitSHA,
+						Environment:      kustomDeploy.Environment,
+						Region:           kustomDeploy.Region,
+						Namespace:        kustomDeploy.Namespace,
+						Tag:              kustomDeploy.Tag,
+						Path:             kustomDeploy.Path,
+					}
+					
+					if err := s.deploymentModel.Upsert(deployment); err != nil {
+						log.Printf("Failed to upsert deployment: %v", err)
+					} else {
+						log.Printf("Upserted deployment for service %s (%d) in %s/%s with tag %s", 
+							kustomDeploy.ServiceName, serviceID, kustomDeploy.Environment, kustomDeploy.Region, kustomDeploy.Tag)
+					}
+				}
+			}
+		}
+	} else {
+		log.Printf("No GitHub client available for scanning %s", repo.Name)
+	}
+
 	// Discover Kubernetes resources
 	resources, err := s.githubClient.DiscoverKubernetesResources(s.ctx, owner, repoName)
 	if err != nil {
@@ -319,19 +389,12 @@ func parseGitHubURL(repoURL string) (owner, repo string, err error) {
 		return "", "", err
 	}
 
-	// Handle both HTTPS and SSH URLs
+	// Handle HTTPS URLs only
 	var pathStr string
 	if u.Host == "github.com" {
 		pathStr = u.Path
-	} else if strings.Contains(repoURL, "git@github.com:") {
-		// SSH URL format: git@github.com:owner/repo.git
-		parts := strings.Split(repoURL, ":")
-		if len(parts) != 2 {
-			return "", "", fmt.Errorf("invalid SSH URL format")
-		}
-		pathStr = "/" + parts[1]
 	} else {
-		return "", "", fmt.Errorf("not a GitHub URL")
+		return "", "", fmt.Errorf("only HTTPS GitHub URLs are supported")
 	}
 
 	pathStr = strings.TrimPrefix(pathStr, "/")
@@ -343,4 +406,97 @@ func parseGitHubURL(repoURL string) (owner, repo string, err error) {
 	}
 
 	return parts[0], parts[1], nil
+}
+
+// correlateTagWithCommit attempts to find the monorepo commit that corresponds to a deployment tag
+func (s *Service) correlateTagWithCommit(serviceID int64, tag string) string {
+	// Get the service to find its monorepo
+	service, err := s.microserviceModel.GetByID(serviceID)
+	if err != nil {
+		log.Printf("Failed to get service %d: %v", serviceID, err)
+		return ""
+	}
+
+	// Get the monorepo details
+	repo, err := s.repoModel.GetByID(service.RepositoryID)
+	if err != nil {
+		log.Printf("Failed to get repository %d: %v", service.RepositoryID, err)
+		return ""
+	}
+
+	// Only process monorepo type repositories
+	if repo.Type != types.MonorepoType {
+		return ""
+	}
+
+	// Parse GitHub URL to get owner and repo name
+	owner, repoName, err := parseGitHubURL(repo.URL)
+	if err != nil {
+		log.Printf("Failed to parse repo URL %s: %v", repo.URL, err)
+		return ""
+	}
+
+	// Search for commits that might match this tag
+	// This is a simple heuristic - in production you might want more sophisticated matching
+	if s.githubClient != nil {
+		// Try to find a commit message or tag that references this release
+		// Look for commits in the service path that might correspond to the tag
+		commitOpts := &goGithub.CommitsListOptions{
+			Path: service.Path,
+			ListOptions: goGithub.ListOptions{PerPage: 50},
+		}
+
+		commits, _, err := s.githubClient.GetGitHubClient().Repositories.ListCommits(s.ctx, owner, repoName, commitOpts)
+		if err != nil {
+			log.Printf("Failed to get commits for service %s: %v", service.Name, err)
+			return ""
+		}
+
+		// Look for commits that might match the tag
+		for _, commit := range commits {
+			if commit.SHA == nil || commit.Commit == nil || commit.Commit.Message == nil {
+				continue
+			}
+
+			message := *commit.Commit.Message
+			sha := *commit.SHA
+
+			// Simple matching logic - look for tag reference in commit message
+			if strings.Contains(strings.ToLower(message), strings.ToLower(tag)) {
+				log.Printf("Found matching commit %s for tag %s: %s", sha[:7], tag, message)
+				return sha
+			}
+
+			// Also check if the tag format matches common patterns
+			if strings.Contains(tag, "release-") {
+				version := strings.TrimPrefix(tag, "release-")
+				if strings.Contains(strings.ToLower(message), version) {
+					log.Printf("Found version matching commit %s for tag %s: %s", sha[:7], tag, message)
+					return sha
+				}
+			}
+		}
+
+		// Try to find Git tags in the repository that match
+		tags, _, err := s.githubClient.GetGitHubClient().Repositories.ListTags(s.ctx, owner, repoName, nil)
+		if err == nil {
+			for _, gitTag := range tags {
+				if gitTag.Name != nil && gitTag.Commit != nil && gitTag.Commit.SHA != nil {
+					if strings.EqualFold(*gitTag.Name, tag) {
+						log.Printf("Found exact git tag match for %s: %s", tag, *gitTag.Commit.SHA)
+						return *gitTag.Commit.SHA
+					}
+				}
+			}
+		}
+	}
+
+	log.Printf("No commit correlation found for tag %s in service %s", tag, service.Name)
+	return ""
+}
+
+// isHexString checks if a string contains only hexadecimal characters
+func isHexString(s string) bool {
+	hexPattern := regexp.MustCompile(`^[a-fA-F0-9]+$`)
+	return hexPattern.MatchString(s)
 }

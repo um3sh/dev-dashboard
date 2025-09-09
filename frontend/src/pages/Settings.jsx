@@ -1,18 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { GetAllConfig, SetConfig, TestJiraConnection, RefreshAllJiraTitles } from '../../wailsjs/go/main/App';
-import { Save, TestTube, RefreshCw, CheckCircle, XCircle, Settings as SettingsIcon } from 'lucide-react';
+import { GetAllConfig, SetConfig, TestJiraConnection, RefreshAllJiraTitles, TestGitHubConnection } from '../../wailsjs/go/main/App';
+import { Save, TestTube, RefreshCw, CheckCircle, XCircle, Settings as SettingsIcon, Github } from 'lucide-react';
 
 const Settings = () => {
   const [config, setConfig] = useState({
     jira_url: '',
     jira_username: '',
     jira_token: '',
-    jira_auth_method: 'basic'
+    jira_auth_method: 'basic',
+    github_token: '',
+    github_enterprise_url: ''
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [testingGithub, setTestingGithub] = useState(false);
   const [message, setMessage] = useState('');
   const [messageType, setMessageType] = useState(''); // 'success', 'error', or ''
 
@@ -28,7 +31,9 @@ const Settings = () => {
         jira_url: configData.jira_url || '',
         jira_username: configData.jira_username || '',
         jira_token: configData.jira_token || '',
-        jira_auth_method: configData.jira_auth_method || 'basic'
+        jira_auth_method: configData.jira_auth_method || 'basic',
+        github_token: configData.github_token || '',
+        github_enterprise_url: configData.github_enterprise_url || ''
       });
     } catch (err) {
       console.error('Failed to load config:', err);
@@ -63,6 +68,8 @@ const Settings = () => {
       await SetConfig('jira_username', config.jira_username);
       await SetConfig('jira_token', config.jira_token);
       await SetConfig('jira_auth_method', config.jira_auth_method);
+      await SetConfig('github_token', config.github_token);
+      await SetConfig('github_enterprise_url', config.github_enterprise_url);
       showMessage('Configuration saved successfully!', 'success');
     } catch (err) {
       console.error('Failed to save config:', err);
@@ -118,6 +125,27 @@ const Settings = () => {
       showMessage('Failed to refresh JIRA titles: ' + err.message, 'error');
     } finally {
       setRefreshing(false);
+    }
+  };
+
+  const handleTestGitHubConnection = async () => {
+    if (!config.github_token) {
+      showMessage('Please enter a GitHub token before testing', 'error');
+      return;
+    }
+
+    // Save config first if changed
+    await handleSave();
+
+    setTestingGithub(true);
+    try {
+      await TestGitHubConnection();
+      showMessage('GitHub connection test successful!', 'success');
+    } catch (err) {
+      console.error('GitHub connection test failed:', err);
+      showMessage('GitHub connection test failed: ' + err.message, 'error');
+    } finally {
+      setTestingGithub(false);
     }
   };
 
@@ -314,6 +342,134 @@ const Settings = () => {
                 </ol>
               </div>
             </div>
+          </div>
+        </div>
+      </div>
+
+      {/* GitHub Integration Section */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+        <div className="px-6 py-4 border-b border-gray-200">
+          <div className="flex items-center gap-3">
+            <Github className="w-6 h-6 text-gray-700" />
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">GitHub Integration</h2>
+              <p className="text-sm text-gray-600 mt-1">
+                Configure GitHub.com or GitHub Enterprise connection for repository data, pull requests, and commits
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="p-6 space-y-6">
+          <div>
+            <label htmlFor="github_enterprise_url" className="block text-sm font-medium text-gray-700 mb-2">
+              GitHub Enterprise URL (Optional)
+            </label>
+            <input
+              type="url"
+              id="github_enterprise_url"
+              name="github_enterprise_url"
+              value={config.github_enterprise_url}
+              onChange={handleInputChange}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="https://github.your-company.com/api/v3"
+              disabled={saving}
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Leave empty for GitHub.com. For GitHub Enterprise Server, enter the API base URL (e.g., https://github.company.com/api/v3)
+            </p>
+          </div>
+          
+          <div>
+            <label htmlFor="github_token" className="block text-sm font-medium text-gray-700 mb-2">
+              GitHub Personal Access Token
+            </label>
+            <input
+              type="password"
+              id="github_token"
+              name="github_token"
+              value={config.github_token}
+              onChange={handleInputChange}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx (for GitHub.com) or ghs_xxxx (for Enterprise)"
+              disabled={saving}
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              {config.github_enterprise_url ? 
+                'Create a token in your GitHub Enterprise instance: Settings → Developer settings → Personal access tokens' :
+                'Create a token at: GitHub.com → Settings → Developer settings → Personal access tokens → Tokens (classic)'
+              }
+            </p>
+          </div>
+
+          <div className="flex gap-3">
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {saving ? (
+                <RefreshCw className="w-4 h-4 animate-spin" />
+              ) : (
+                <Save className="w-4 h-4" />
+              )}
+              {saving ? 'Saving...' : 'Save Configuration'}
+            </button>
+
+            <button
+              onClick={handleTestGitHubConnection}
+              disabled={testingGithub || !config.github_token}
+              className="flex items-center gap-2 px-4 py-2 border border-green-600 text-green-600 rounded-lg hover:bg-green-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {testingGithub ? (
+                <RefreshCw className="w-4 h-4 animate-spin" />
+              ) : (
+                <TestTube className="w-4 h-4" />
+              )}
+              {testingGithub ? 'Testing...' : 'Test Connection'}
+            </button>
+          </div>
+
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <h3 className="font-medium text-blue-900 mb-2">
+              {config.github_enterprise_url ? 'GitHub Enterprise Setup:' : 'GitHub.com Setup:'}
+            </h3>
+            
+            {config.github_enterprise_url ? (
+              <div className="space-y-4">
+                <div>
+                  <h4 className="font-medium text-blue-900 mb-1">GitHub Enterprise Server:</h4>
+                  <ol className="text-sm text-blue-800 space-y-1 list-decimal list-inside ml-2">
+                    <li>Enter your GitHub Enterprise API URL (e.g., https://github.company.com/api/v3)</li>
+                    <li>Go to your GitHub Enterprise instance → Settings → Developer settings → Personal access tokens</li>
+                    <li>Click "Generate new token" and give it a descriptive name</li>
+                    <li>Select expiration and required scopes: <code className="bg-blue-100 px-1 rounded">repo</code>, <code className="bg-blue-100 px-1 rounded">read:org</code></li>
+                    <li>Copy the token and paste it above</li>
+                  </ol>
+                </div>
+              </div>
+            ) : (
+              <ol className="text-sm text-blue-800 space-y-1 list-decimal list-inside ml-2">
+                <li>Go to GitHub.com → Settings → Developer settings → Personal access tokens → Tokens (classic)</li>
+                <li>Click "Generate new token" → "Generate new token (classic)"</li>
+                <li>Give it a descriptive name (e.g., "Dev Dashboard")</li>
+                <li>Select expiration (recommend 90 days or more)</li>
+                <li>Select these scopes: <code className="bg-blue-100 px-1 rounded">repo</code>, <code className="bg-blue-100 px-1 rounded">read:org</code></li>
+                <li>Click "Generate token" and copy it immediately</li>
+                <li>Paste it in the field above and save the configuration</li>
+              </ol>
+            )}
+          </div>
+
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+            <h3 className="font-medium text-amber-900 mb-2">Required Token Permissions:</h3>
+            <ul className="text-sm text-amber-800 space-y-1 list-disc list-inside ml-2">
+              <li><code className="bg-amber-100 px-1 rounded">repo</code> - Access to repository contents, issues, and pull requests</li>
+              <li><code className="bg-amber-100 px-1 rounded">read:org</code> - Read organization membership (for organization repositories)</li>
+            </ul>
+            <p className="text-xs text-amber-700 mt-2">
+              Without proper permissions, you won't be able to see pull requests and commit history for your services.
+            </p>
           </div>
         </div>
       </div>

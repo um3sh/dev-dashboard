@@ -1,10 +1,10 @@
-# Testing the GitHub Dashboard Desktop Application
+# Testing the Dev Dashboard Desktop Application
 
 ## Quick Start
 
 ### 1. Run the Built Application (Recommended)
 ```bash
-./build/bin/gh-dashboard
+./build/bin/dev-dashboard
 ```
 This runs the production build as a native desktop application.
 
@@ -23,14 +23,14 @@ wails dev
 ### 3. With GitHub Integration (Optional)
 ```bash
 export GITHUB_TOKEN=your_github_personal_access_token
-./build/bin/gh-dashboard
+./build/bin/dev-dashboard
 ```
 
 ## What to Expect
 
 ### Desktop Application Features
 - **Window**: Native desktop window (1200x800, resizable)
-- **Title**: "GitHub Dashboard" in the window title bar
+- **Title**: "Dev Dashboard" in the window title bar
 - **Controls**: Standard window controls (minimize, maximize, close)
 - **Behavior**: Runs like any other desktop application
 
@@ -54,8 +54,8 @@ export GITHUB_TOKEN=your_github_personal_access_token
 ### Database Issues
 If you see database-related errors:
 - The app will still run but with limited functionality
-- Check logs for database path: `~/.gh-dashboard/database.db`
-- Delete the database file to reset: `rm -rf ~/.gh-dashboard/`
+- Check logs for database path: `~/.dev-dashboard/database.db`
+- Delete the database file to reset: `rm -rf ~/.dev-dashboard/`
 
 ### WebKit Messages
 Messages like "Overriding existing handler for signal 10" are normal WebKit messages and don't indicate problems.
@@ -64,7 +64,7 @@ Messages like "Overriding existing handler for signal 10" are normal WebKit mess
 If the app doesn't open a window:
 1. Check the terminal output for error messages
 2. Ensure you have required system dependencies
-3. Try running the built executable directly: `./build/bin/gh-dashboard`
+3. Try running the built executable directly: `./build/bin/dev-dashboard`
 
 ## System Requirements
 

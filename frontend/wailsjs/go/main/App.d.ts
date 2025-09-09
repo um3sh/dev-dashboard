@@ -7,6 +7,8 @@ export function CreateProject(arg1:types.Project):Promise<void>;
 
 export function CreateRepository(arg1:types.Repository):Promise<void>;
 
+export function CreateRepositoryWithAuth(arg1:Record<string, any>):Promise<void>;
+
 export function CreateTask(arg1:types.Task):Promise<void>;
 
 export function CreateTaskWithJiraTitle(arg1:types.Task):Promise<void>;
@@ -16,6 +18,8 @@ export function DeleteProject(arg1:number):Promise<void>;
 export function DeleteRepository(arg1:number):Promise<void>;
 
 export function DeleteTask(arg1:number):Promise<void>;
+
+export function DiscoverRepositoryServices(arg1:string,arg2:string,arg3:string,arg4:Record<string, any>):Promise<Array<Record<string, any>>>;
 
 export function FetchJiraTicketTitle(arg1:string):Promise<string>;
 
@@ -41,6 +45,16 @@ export function GetRecentActions(arg1:number,arg2:number):Promise<Array<types.Ac
 
 export function GetRepositories():Promise<Array<types.Repository>>;
 
+export function GetServiceCommitDeployments(arg1:number):Promise<Array<types.CommitDeploymentStatus>>;
+
+export function GetServiceCommits(arg1:number):Promise<Array<types.Commit>>;
+
+export function GetServiceDeploymentHistory(arg1:number):Promise<Array<types.Commit>>;
+
+export function GetServiceDeployments(arg1:number):Promise<Array<types.DeploymentOverview>>;
+
+export function GetServicePullRequests(arg1:number):Promise<Array<types.PullRequest>>;
+
 export function GetTask(arg1:number):Promise<types.Task>;
 
 export function GetTasks():Promise<Array<types.TaskWithProject>>;
@@ -53,13 +67,27 @@ export function GetTasksInDateRange(arg1:time.Time,arg2:time.Time):Promise<Array
 
 export function Greet(arg1:string):Promise<string>;
 
+export function RediscoverRepositoryServices(arg1:number,arg2:string,arg3:Record<string, any>):Promise<void>;
+
 export function RefreshAllJiraTitles():Promise<void>;
 
 export function SetConfig(arg1:string,arg2:string):Promise<void>;
 
 export function SyncRepository(arg1:number):Promise<void>;
 
+export function TestCommitDeploymentCorrelation(arg1:number):Promise<string>;
+
+export function TestDeploymentData():Promise<Record<string, any>>;
+
+export function TestGitHubConnection():Promise<void>;
+
 export function TestJiraConnection():Promise<void>;
+
+export function TestKustomizationFileAccess():Promise<Record<string, any>>;
+
+export function TestScanKubernetesDeployments():Promise<void>;
+
+export function TestServiceCommitsFetch(arg1:number):Promise<string>;
 
 export function UpdateProject(arg1:types.Project):Promise<void>;
 
@@ -70,3 +98,5 @@ export function UpdateTask(arg1:types.Task):Promise<void>;
 export function UpdateTaskJiraTitle(arg1:number,arg2:string):Promise<void>;
 
 export function UpdateTaskStatus(arg1:number,arg2:types.TaskStatus):Promise<void>;
+
+export function ValidateRepositoryAccess(arg1:string,arg2:string,arg3:Record<string, any>):Promise<Record<string, any>>;

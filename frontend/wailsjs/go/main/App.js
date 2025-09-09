@@ -10,6 +10,10 @@ export function CreateRepository(arg1) {
   return window['go']['main']['App']['CreateRepository'](arg1);
 }
 
+export function CreateRepositoryWithAuth(arg1) {
+  return window['go']['main']['App']['CreateRepositoryWithAuth'](arg1);
+}
+
 export function CreateTask(arg1) {
   return window['go']['main']['App']['CreateTask'](arg1);
 }
@@ -28,6 +32,10 @@ export function DeleteRepository(arg1) {
 
 export function DeleteTask(arg1) {
   return window['go']['main']['App']['DeleteTask'](arg1);
+}
+
+export function DiscoverRepositoryServices(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['DiscoverRepositoryServices'](arg1, arg2, arg3, arg4);
 }
 
 export function FetchJiraTicketTitle(arg1) {
@@ -78,6 +86,26 @@ export function GetRepositories() {
   return window['go']['main']['App']['GetRepositories']();
 }
 
+export function GetServiceCommitDeployments(arg1) {
+  return window['go']['main']['App']['GetServiceCommitDeployments'](arg1);
+}
+
+export function GetServiceCommits(arg1) {
+  return window['go']['main']['App']['GetServiceCommits'](arg1);
+}
+
+export function GetServiceDeploymentHistory(arg1) {
+  return window['go']['main']['App']['GetServiceDeploymentHistory'](arg1);
+}
+
+export function GetServiceDeployments(arg1) {
+  return window['go']['main']['App']['GetServiceDeployments'](arg1);
+}
+
+export function GetServicePullRequests(arg1) {
+  return window['go']['main']['App']['GetServicePullRequests'](arg1);
+}
+
 export function GetTask(arg1) {
   return window['go']['main']['App']['GetTask'](arg1);
 }
@@ -102,6 +130,10 @@ export function Greet(arg1) {
   return window['go']['main']['App']['Greet'](arg1);
 }
 
+export function RediscoverRepositoryServices(arg1, arg2, arg3) {
+  return window['go']['main']['App']['RediscoverRepositoryServices'](arg1, arg2, arg3);
+}
+
 export function RefreshAllJiraTitles() {
   return window['go']['main']['App']['RefreshAllJiraTitles']();
 }
@@ -114,8 +146,32 @@ export function SyncRepository(arg1) {
   return window['go']['main']['App']['SyncRepository'](arg1);
 }
 
+export function TestCommitDeploymentCorrelation(arg1) {
+  return window['go']['main']['App']['TestCommitDeploymentCorrelation'](arg1);
+}
+
+export function TestDeploymentData() {
+  return window['go']['main']['App']['TestDeploymentData']();
+}
+
+export function TestGitHubConnection() {
+  return window['go']['main']['App']['TestGitHubConnection']();
+}
+
 export function TestJiraConnection() {
   return window['go']['main']['App']['TestJiraConnection']();
+}
+
+export function TestKustomizationFileAccess() {
+  return window['go']['main']['App']['TestKustomizationFileAccess']();
+}
+
+export function TestScanKubernetesDeployments() {
+  return window['go']['main']['App']['TestScanKubernetesDeployments']();
+}
+
+export function TestServiceCommitsFetch(arg1) {
+  return window['go']['main']['App']['TestServiceCommitsFetch'](arg1);
 }
 
 export function UpdateProject(arg1) {
@@ -136,4 +192,8 @@ export function UpdateTaskJiraTitle(arg1, arg2) {
 
 export function UpdateTaskStatus(arg1, arg2) {
   return window['go']['main']['App']['UpdateTaskStatus'](arg1, arg2);
+}
+
+export function ValidateRepositoryAccess(arg1, arg2, arg3) {
+  return window['go']['main']['App']['ValidateRepositoryAccess'](arg1, arg2, arg3);
 }

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"gh-dashboard/pkg/types"
+	"dev-dashboard/pkg/types"
 )
 
 type KubernetesResourceModel struct {

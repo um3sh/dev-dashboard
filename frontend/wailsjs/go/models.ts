@@ -133,6 +133,157 @@ export namespace types {
 		    return a;
 		}
 	}
+	export class Commit {
+	    hash: string;
+	    message: string;
+	    author: string;
+	    date: time.Time;
+	
+	    static createFrom(source: any = {}) {
+	        return new Commit(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.hash = source["hash"];
+	        this.message = source["message"];
+	        this.author = source["author"];
+	        this.date = this.convertValues(source["date"], time.Time);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class DeploymentStatus {
+	    environment: string;
+	    region: string;
+	    namespace: string;
+	    tag: string;
+	    is_deployed: boolean;
+	    deployed_at: time.Time;
+	
+	    static createFrom(source: any = {}) {
+	        return new DeploymentStatus(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.environment = source["environment"];
+	        this.region = source["region"];
+	        this.namespace = source["namespace"];
+	        this.tag = source["tag"];
+	        this.is_deployed = source["is_deployed"];
+	        this.deployed_at = this.convertValues(source["deployed_at"], time.Time);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class CommitDeploymentStatus {
+	    commit: Commit;
+	    deployments: DeploymentStatus[];
+	
+	    static createFrom(source: any = {}) {
+	        return new CommitDeploymentStatus(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.commit = this.convertValues(source["commit"], Commit);
+	        this.deployments = this.convertValues(source["deployments"], DeploymentStatus);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class DeploymentOverview {
+	    commit_sha: string;
+	    environment: string;
+	    region: string;
+	    namespace: string;
+	    tag: string;
+	    updated_at: time.Time;
+	    kubernetes_repo_name: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new DeploymentOverview(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.commit_sha = source["commit_sha"];
+	        this.environment = source["environment"];
+	        this.region = source["region"];
+	        this.namespace = source["namespace"];
+	        this.tag = source["tag"];
+	        this.updated_at = this.convertValues(source["updated_at"], time.Time);
+	        this.kubernetes_repo_name = source["kubernetes_repo_name"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
 	export class KubernetesResource {
 	    id: number;
 	    repository_id: number;
@@ -237,6 +388,48 @@ export namespace types {
 	        this.description = source["description"];
 	        this.created_at = this.convertValues(source["created_at"], time.Time);
 	        this.updated_at = this.convertValues(source["updated_at"], time.Time);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class PullRequest {
+	    id: number;
+	    number: number;
+	    title: string;
+	    status: string;
+	    author: string;
+	    branch: string;
+	    created_at: time.Time;
+	
+	    static createFrom(source: any = {}) {
+	        return new PullRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.number = source["number"];
+	        this.title = source["title"];
+	        this.status = source["status"];
+	        this.author = source["author"];
+	        this.branch = source["branch"];
+	        this.created_at = this.convertValues(source["created_at"], time.Time);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

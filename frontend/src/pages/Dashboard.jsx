@@ -19,44 +19,39 @@ const Dashboard = () => {
     kubernetesResources: 0,
     recentActions: []
   });
+  const [loading, setLoading] = useState(true);
 
-  // Mock data for demonstration
+  // Load real dashboard stats
   useEffect(() => {
-    setStats({
-      repositories: 3,
-      microservices: 45,
-      kubernetesResources: 12,
-      recentActions: [
-        {
-          id: 1,
-          type: 'build',
-          service: 'user-service',
-          status: 'success',
-          commit: 'a1b2c3d',
-          branch: 'main',
-          timestamp: '2 minutes ago'
-        },
-        {
-          id: 2,
-          type: 'deployment',
-          service: 'payment-service',
-          status: 'running',
-          commit: 'e4f5g6h',
-          branch: 'main',
-          timestamp: '5 minutes ago'
-        },
-        {
-          id: 3,
-          type: 'build',
-          service: 'notification-service',
-          status: 'failure',
-          commit: 'i7j8k9l',
-          branch: 'feature/alerts',
-          timestamp: '10 minutes ago'
-        }
-      ]
-    });
+    loadDashboardStats();
   }, []);
+
+  const loadDashboardStats = async () => {
+    try {
+      // Add a small delay to ensure Wails is initialized
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      const dashboardStats = await window.go.main.App.GetDashboardStats();
+      // Ensure all required fields exist
+      setStats({
+        repositories: dashboardStats?.repositories || 0,
+        microservices: dashboardStats?.microservices || 0,
+        kubernetesResources: dashboardStats?.kubernetesResources || 0,
+        recentActions: dashboardStats?.recentActions || []
+      });
+    } catch (error) {
+      console.error('Failed to load dashboard stats:', error);
+      // Set empty stats on error
+      setStats({
+        repositories: 0,
+        microservices: 0,
+        kubernetesResources: 0,
+        recentActions: []
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const getStatusIcon = (status) => {
     switch (status) {
@@ -71,12 +66,20 @@ const Dashboard = () => {
     }
   };
 
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center min-h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-7xl mx-auto">
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
         <p className="mt-2 text-gray-600">
-          Overview of your monorepo services and Kubernetes resources
+          Overview of your development projects and repositories
         </p>
       </div>
 
@@ -125,7 +128,7 @@ const Dashboard = () => {
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-500">Recent Actions</p>
-              <p className="text-2xl font-bold text-gray-900">{stats.recentActions.length}</p>
+              <p className="text-2xl font-bold text-gray-900">{stats.recentActions?.length || 0}</p>
             </div>
           </div>
         </div>
@@ -136,26 +139,34 @@ const Dashboard = () => {
         <div className="card">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">Recent Actions</h2>
           <div className="space-y-4">
-            {stats.recentActions.map((action) => (
-              <div key={action.id} className="flex items-center space-x-4 p-3 bg-gray-50 rounded-lg">
-                {getStatusIcon(action.status)}
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-900">
-                    {action.type} • {action.service}
-                  </p>
-                  <div className="flex items-center space-x-2 text-sm text-gray-500">
-                    <GitBranch className="h-4 w-4" />
-                    <span>{action.branch}</span>
-                    <span>•</span>
-                    <span>{action.commit}</span>
+            {stats.recentActions && stats.recentActions.length > 0 ? (
+              stats.recentActions.map((action) => (
+                <div key={action.id} className="flex items-center space-x-4 p-3 bg-gray-50 rounded-lg">
+                  {getStatusIcon(action.status)}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-900">
+                      {action.type} • {action.service_name || action.resource_name || 'Unknown'}
+                    </p>
+                    <div className="flex items-center space-x-2 text-sm text-gray-500">
+                      <GitBranch className="h-4 w-4" />
+                      <span>{action.branch}</span>
+                      <span>•</span>
+                      <span>{action.commit}</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center text-sm text-gray-500">
+                    <Clock className="h-4 w-4 mr-1" />
+                    {new Date(action.started_at).toLocaleDateString()}
                   </div>
                 </div>
-                <div className="flex items-center text-sm text-gray-500">
-                  <Clock className="h-4 w-4 mr-1" />
-                  {action.timestamp}
-                </div>
+              ))
+            ) : (
+              <div className="text-center py-8">
+                <Activity className="mx-auto h-12 w-12 text-gray-300" />
+                <h3 className="mt-2 text-sm font-medium text-gray-900">No recent actions</h3>
+                <p className="mt-1 text-sm text-gray-500">Actions will appear here when repositories are synced.</p>
               </div>
-            ))}
+            )}
           </div>
           <div className="mt-4">
             <Link 

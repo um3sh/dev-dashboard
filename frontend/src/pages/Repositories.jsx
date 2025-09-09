@@ -10,18 +10,11 @@ import {
   Trash2,
   RefreshCw
 } from 'lucide-react';
+import RepositoryModal from '../components/RepositoryModal';
 
 const Repositories = () => {
   const [repositories, setRepositories] = useState([]);
-  const [showAddForm, setShowAddForm] = useState(false);
-  const [newRepo, setNewRepo] = useState({
-    name: '',
-    url: '',
-    type: 'monorepo',
-    description: '',
-    serviceName: '',
-    serviceLocation: ''
-  });
+  const [showAddModal, setShowAddModal] = useState(false);
 
   // Load repositories from backend
   useEffect(() => {
@@ -37,24 +30,37 @@ const Repositories = () => {
     }
   };
 
-  const handleAddRepository = async (e) => {
-    e.preventDefault();
+  const handleRepositoryCreated = async () => {
+    await loadRepositories(); // Refresh the list
+    setShowAddModal(false);
+  };
+
+  const handleRediscoverServices = async (repo) => {
+    if (repo.type !== 'monorepo') {
+      alert('Service discovery is only available for monorepo repositories.');
+      return;
+    }
+
     try {
-      await window.go.main.App.CreateRepository({
-        name: newRepo.name,
-        url: newRepo.url,
-        type: newRepo.type,
-        description: newRepo.description,
-        serviceName: newRepo.serviceName,
-        serviceLocation: newRepo.serviceLocation
-      });
+      // Check if GitHub token is configured
+      const config = await window.go.main.App.GetAllConfig();
+      if (!config.github_token || !config.github_token.trim()) {
+        alert('GitHub token not configured. Please go to Settings and configure your GitHub Personal Access Token first.');
+        return;
+      }
+
+      // Use globally configured token (empty credentials object for PAT)
+      await window.go.main.App.RediscoverRepositoryServices(repo.id, 'pat', {});
       
+      alert(`Service discovery completed for ${repo.name}.`);
       await loadRepositories(); // Refresh the list
-      setNewRepo({ name: '', url: '', type: 'monorepo', description: '', serviceName: '', serviceLocation: '' });
-      setShowAddForm(false);
     } catch (error) {
-      console.error('Failed to add repository:', error);
-      alert('Failed to add repository: ' + error);
+      console.error('Failed to rediscover services:', error);
+      if (error.message.includes('GitHub') || error.message.includes('token')) {
+        alert(`Failed to rediscover services: ${error.message}. Please check your GitHub token configuration in Settings.`);
+      } else {
+        alert(`Failed to rediscover services: ${error.message}`);
+      }
     }
   };
 
@@ -98,7 +104,7 @@ const Repositories = () => {
           </p>
         </div>
         <button
-          onClick={() => setShowAddForm(true)}
+          onClick={() => setShowAddModal(true)}
           className="btn-primary flex items-center"
         >
           <Plus className="h-5 w-5 mr-2" />
@@ -106,92 +112,12 @@ const Repositories = () => {
         </button>
       </div>
 
-      {/* Add Repository Form */}
-      {showAddForm && (
-        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Add Repository</h3>
-            <form onSubmit={handleAddRepository} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Name</label>
-                <input
-                  type="text"
-                  value={newRepo.name}
-                  onChange={(e) => setNewRepo({...newRepo, name: e.target.value})}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">URL</label>
-                <input
-                  type="url"
-                  value={newRepo.url}
-                  onChange={(e) => setNewRepo({...newRepo, url: e.target.value})}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                  placeholder="https://github.com/owner/repo"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Type</label>
-                <select
-                  value={newRepo.type}
-                  onChange={(e) => setNewRepo({...newRepo, type: e.target.value})}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                >
-                  <option value="monorepo">Monorepo</option>
-                  <option value="kubernetes">Kubernetes</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Description</label>
-                <textarea
-                  value={newRepo.description}
-                  onChange={(e) => setNewRepo({...newRepo, description: e.target.value})}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                  rows={3}
-                />
-              </div>
-              {newRepo.type === 'monorepo' && (
-                <>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Service Name</label>
-                    <input
-                      type="text"
-                      value={newRepo.serviceName}
-                      onChange={(e) => setNewRepo({...newRepo, serviceName: e.target.value})}
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                      placeholder="e.g., user-service, api-gateway"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Service Location</label>
-                    <input
-                      type="text"
-                      value={newRepo.serviceLocation}
-                      onChange={(e) => setNewRepo({...newRepo, serviceLocation: e.target.value})}
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                      placeholder="e.g., services/, apps/backend/"
-                    />
-                  </div>
-                </>
-              )}
-              <div className="flex justify-end space-x-3 pt-4">
-                <button
-                  type="button"
-                  onClick={() => setShowAddForm(false)}
-                  className="btn-secondary"
-                >
-                  Cancel
-                </button>
-                <button type="submit" className="btn-primary">
-                  Add Repository
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+      {/* Add Repository Modal */}
+      {showAddModal && (
+        <RepositoryModal
+          onClose={() => setShowAddModal(false)}
+          onRepositoryCreated={handleRepositoryCreated}
+        />
       )}
 
       {/* Repositories List */}
@@ -239,7 +165,11 @@ const Repositories = () => {
               </div>
               
               <div className="flex items-center space-x-2">
-                <button className="p-2 text-gray-400 hover:text-blue-600 rounded-md hover:bg-gray-100">
+                <button 
+                  onClick={() => handleRediscoverServices(repo)}
+                  className="p-2 text-gray-400 hover:text-blue-600 rounded-md hover:bg-gray-100"
+                  title="Rediscover Services"
+                >
                   <RefreshCw className="h-5 w-5" />
                 </button>
                 <Link
@@ -265,7 +195,7 @@ const Repositories = () => {
             <h3 className="mt-2 text-sm font-medium text-gray-900">No repositories</h3>
             <p className="mt-1 text-sm text-gray-500">Get started by adding a new repository.</p>
             <button
-              onClick={() => setShowAddForm(true)}
+              onClick={() => setShowAddModal(true)}
               className="mt-6 btn-primary"
             >
               <Plus className="h-5 w-5 mr-2" />

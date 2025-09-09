@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { 
   Package, 
   Play,
@@ -15,94 +15,69 @@ import {
 
 const Microservices = () => {
   const { repoId } = useParams();
+  const navigate = useNavigate();
   const [services, setServices] = useState([]);
   const [repository, setRepository] = useState(null);
   const [filter, setFilter] = useState('all');
   const [selectedService, setSelectedService] = useState(null);
 
-  // Mock data for demonstration
+  // Load real microservices data
   useEffect(() => {
-    setRepository({
-      id: 1,
-      name: 'main-monorepo',
-      type: 'monorepo'
-    });
-
-    setServices([
-      {
-        id: 1,
-        name: 'user-service',
-        path: 'services/user-service',
-        description: 'User authentication and management service',
-        lastBuild: {
-          status: 'success',
-          commit: 'a1b2c3d',
-          branch: 'main',
-          timestamp: '2024-01-20T14:30:00Z',
-          buildHash: 'build-123'
-        },
-        lastDeployment: {
-          status: 'success',
-          commit: 'a1b2c3d',
-          branch: 'main',
-          timestamp: '2024-01-20T14:35:00Z',
-          buildHash: 'build-123'
-        },
-        recentActions: [
-          { type: 'build', status: 'success', timestamp: '2024-01-20T14:30:00Z' },
-          { type: 'deployment', status: 'success', timestamp: '2024-01-20T14:35:00Z' }
-        ]
-      },
-      {
-        id: 2,
-        name: 'payment-service',
-        path: 'services/payment-service',
-        description: 'Payment processing and billing service',
-        lastBuild: {
-          status: 'running',
-          commit: 'e4f5g6h',
-          branch: 'main',
-          timestamp: '2024-01-20T15:00:00Z',
-          buildHash: 'build-124'
-        },
-        lastDeployment: {
-          status: 'success',
-          commit: 'x9y8z7w',
-          branch: 'main',
-          timestamp: '2024-01-20T10:15:00Z',
-          buildHash: 'build-122'
-        },
-        recentActions: [
-          { type: 'build', status: 'running', timestamp: '2024-01-20T15:00:00Z' },
-          { type: 'deployment', status: 'success', timestamp: '2024-01-20T10:15:00Z' }
-        ]
-      },
-      {
-        id: 3,
-        name: 'notification-service',
-        path: 'services/notification-service',
-        description: 'Email and SMS notification service',
-        lastBuild: {
-          status: 'failure',
-          commit: 'i7j8k9l',
-          branch: 'feature/alerts',
-          timestamp: '2024-01-20T13:45:00Z',
-          buildHash: null
-        },
-        lastDeployment: {
-          status: 'success',
-          commit: 'm3n4o5p',
-          branch: 'main',
-          timestamp: '2024-01-19T16:20:00Z',
-          buildHash: 'build-121'
-        },
-        recentActions: [
-          { type: 'build', status: 'failure', timestamp: '2024-01-20T13:45:00Z' },
-          { type: 'deployment', status: 'success', timestamp: '2024-01-19T16:20:00Z' }
-        ]
-      }
-    ]);
+    loadMicroservices();
+    if (repoId) {
+      loadRepository();
+    }
   }, [repoId]);
+
+  const loadMicroservices = async () => {
+    try {
+      // If no repoId, get all microservices (pass 0), otherwise get for specific repo
+      const repositoryId = repoId ? parseInt(repoId) : 0;
+      const microservices = await window.go.main.App.GetMicroservices(repositoryId);
+      
+      // Transform the data to include action information
+      const servicesWithActions = await Promise.all(
+        (microservices || []).map(async (service) => {
+          try {
+            const actions = await window.go.main.App.GetMicroserviceActions(service.id, 10);
+            const buildActions = actions?.filter(a => a.type === 'build') || [];
+            const deployActions = actions?.filter(a => a.type === 'deployment') || [];
+            
+            return {
+              ...service,
+              lastBuild: buildActions.length > 0 ? buildActions[0] : null,
+              lastDeployment: deployActions.length > 0 ? deployActions[0] : null
+            };
+          } catch (err) {
+            console.error(`Failed to load actions for service ${service.name}:`, err);
+            return {
+              ...service,
+              lastBuild: null,
+              lastDeployment: null
+            };
+          }
+        })
+      );
+      
+      setServices(servicesWithActions);
+    } catch (error) {
+      console.error('Failed to load microservices:', error);
+      setServices([]);
+    }
+  };
+
+  const loadRepository = async () => {
+    if (!repoId) return;
+    
+    try {
+      const repositories = await window.go.main.App.GetRepositories();
+      const repo = repositories?.find(r => r.id === parseInt(repoId));
+      setRepository(repo || null);
+    } catch (error) {
+      console.error('Failed to load repository:', error);
+      setRepository(null);
+    }
+  };
 
   const getStatusIcon = (status) => {
     switch (status) {
@@ -139,11 +114,17 @@ const Microservices = () => {
     });
   };
 
+  const handleViewDetails = (serviceId) => {
+    // Navigate to service details page, which will trigger the Layout component
+    // to update the dropdown and show service-specific navigation
+    navigate(`/service/${serviceId}`);
+  };
+
   const filteredServices = services.filter(service => {
     if (filter === 'all') return true;
-    if (filter === 'success') return service.lastBuild.status === 'success';
-    if (filter === 'failure') return service.lastBuild.status === 'failure';
-    if (filter === 'running') return service.lastBuild.status === 'running';
+    if (filter === 'success') return service.lastBuild?.status === 'success';
+    if (filter === 'failure') return service.lastBuild?.status === 'failure';
+    if (filter === 'running') return service.lastBuild?.status === 'running';
     return true;
   });
 
@@ -202,12 +183,20 @@ const Microservices = () => {
                   </div>
                 </div>
               </div>
-              <button
-                onClick={() => setSelectedService(selectedService === service.id ? null : service.id)}
-                className="btn-secondary"
-              >
-                View Details
-              </button>
+              <div className="flex space-x-2">
+                <button
+                  onClick={() => handleViewDetails(service.id)}
+                  className="btn-primary"
+                >
+                  More Details
+                </button>
+                <button
+                  onClick={() => setSelectedService(selectedService === service.id ? null : service.id)}
+                  className="btn-secondary"
+                >
+                  {selectedService === service.id ? 'Hide' : 'Quick View'}
+                </button>
+              </div>
             </div>
 
             {/* Build and Deployment Status */}
@@ -216,23 +205,29 @@ const Microservices = () => {
               <div className="bg-gray-50 p-4 rounded-lg">
                 <div className="flex items-center justify-between mb-2">
                   <h4 className="text-sm font-medium text-gray-700">Last Build</h4>
-                  <span className={getStatusClass(service.lastBuild.status)}>
-                    {service.lastBuild.status}
+                  <span className={getStatusClass(service.lastBuild?.status || 'pending')}>
+                    {service.lastBuild?.status || 'No builds'}
                   </span>
                 </div>
                 <div className="space-y-1 text-sm text-gray-600">
-                  <div className="flex items-center">
-                    <GitBranch className="h-4 w-4 mr-2" />
-                    <span>{service.lastBuild.branch} • {service.lastBuild.commit}</span>
-                  </div>
-                  <div className="flex items-center">
-                    <Clock className="h-4 w-4 mr-2" />
-                    <span>{formatDate(service.lastBuild.timestamp)}</span>
-                  </div>
-                  {service.lastBuild.buildHash && (
-                    <div className="text-xs text-gray-500">
-                      Build: {service.lastBuild.buildHash}
-                    </div>
+                  {service.lastBuild ? (
+                    <>
+                      <div className="flex items-center">
+                        <GitBranch className="h-4 w-4 mr-2" />
+                        <span>{service.lastBuild.branch} • {service.lastBuild.commit}</span>
+                      </div>
+                      <div className="flex items-center">
+                        <Clock className="h-4 w-4 mr-2" />
+                        <span>{formatDate(service.lastBuild.timestamp)}</span>
+                      </div>
+                      {service.lastBuild.buildHash && (
+                        <div className="text-xs text-gray-500">
+                          Build: {service.lastBuild.buildHash}
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <div className="text-gray-500">No build history available</div>
                   )}
                 </div>
               </div>
@@ -241,23 +236,29 @@ const Microservices = () => {
               <div className="bg-gray-50 p-4 rounded-lg">
                 <div className="flex items-center justify-between mb-2">
                   <h4 className="text-sm font-medium text-gray-700">Last Deployment</h4>
-                  <span className={getStatusClass(service.lastDeployment.status)}>
-                    {service.lastDeployment.status}
+                  <span className={getStatusClass(service.lastDeployment?.status || 'pending')}>
+                    {service.lastDeployment?.status || 'No deployments'}
                   </span>
                 </div>
                 <div className="space-y-1 text-sm text-gray-600">
-                  <div className="flex items-center">
-                    <GitBranch className="h-4 w-4 mr-2" />
-                    <span>{service.lastDeployment.branch} • {service.lastDeployment.commit}</span>
-                  </div>
-                  <div className="flex items-center">
-                    <Clock className="h-4 w-4 mr-2" />
-                    <span>{formatDate(service.lastDeployment.timestamp)}</span>
-                  </div>
-                  {service.lastDeployment.buildHash && (
-                    <div className="text-xs text-gray-500">
-                      Build: {service.lastDeployment.buildHash}
-                    </div>
+                  {service.lastDeployment ? (
+                    <>
+                      <div className="flex items-center">
+                        <GitBranch className="h-4 w-4 mr-2" />
+                        <span>{service.lastDeployment.branch} • {service.lastDeployment.commit}</span>
+                      </div>
+                      <div className="flex items-center">
+                        <Clock className="h-4 w-4 mr-2" />
+                        <span>{formatDate(service.lastDeployment.timestamp)}</span>
+                      </div>
+                      {service.lastDeployment.buildHash && (
+                        <div className="text-xs text-gray-500">
+                          Build: {service.lastDeployment.buildHash}
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <div className="text-gray-500">No deployment history available</div>
                   )}
                 </div>
               </div>
@@ -268,17 +269,34 @@ const Microservices = () => {
               <div className="mt-4 p-4 bg-gray-50 rounded-lg">
                 <h4 className="text-sm font-medium text-gray-700 mb-3">Recent Actions</h4>
                 <div className="space-y-2">
-                  {service.recentActions.map((action, index) => (
-                    <div key={index} className="flex items-center space-x-3 text-sm">
-                      {getStatusIcon(action.status)}
-                      <span className="capitalize">{action.type}</span>
+                  {service.lastBuild && (
+                    <div className="flex items-center space-x-3 text-sm">
+                      {getStatusIcon(service.lastBuild.status)}
+                      <span className="capitalize">build</span>
                       <span className="text-gray-500">•</span>
-                      <span className="text-gray-500">{formatDate(action.timestamp)}</span>
+                      <span className="text-gray-500">{formatDate(service.lastBuild.timestamp)}</span>
                     </div>
-                  ))}
+                  )}
+                  {service.lastDeployment && (
+                    <div className="flex items-center space-x-3 text-sm">
+                      {getStatusIcon(service.lastDeployment.status)}
+                      <span className="capitalize">deployment</span>
+                      <span className="text-gray-500">•</span>
+                      <span className="text-gray-500">{formatDate(service.lastDeployment.timestamp)}</span>
+                    </div>
+                  )}
+                  {!service.lastBuild && !service.lastDeployment && (
+                    <div className="text-gray-500 text-sm">No recent actions available</div>
+                  )}
                 </div>
                 <div className="mt-3 flex space-x-2">
-                  <button className="btn-primary text-xs">
+                  <button 
+                    onClick={() => handleViewDetails(service.id)}
+                    className="btn-primary text-xs"
+                  >
+                    Full Details
+                  </button>
+                  <button className="btn-secondary text-xs">
                     <Play className="h-4 w-4 mr-1" />
                     Trigger Build
                   </button>

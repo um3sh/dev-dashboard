@@ -80,6 +80,23 @@ CREATE TABLE IF NOT EXISTS tasks (
     UNIQUE(project_id, jira_ticket_id)
 );
 
+CREATE TABLE IF NOT EXISTS deployments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    service_id INTEGER NOT NULL,
+    kubernetes_repo_id INTEGER NOT NULL,
+    commit_sha TEXT NOT NULL,
+    environment TEXT NOT NULL,
+    region TEXT NOT NULL,
+    namespace TEXT,
+    tag TEXT NOT NULL,
+    path TEXT NOT NULL,
+    discovered_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (service_id) REFERENCES microservices(id) ON DELETE CASCADE,
+    FOREIGN KEY (kubernetes_repo_id) REFERENCES repositories(id) ON DELETE CASCADE,
+    UNIQUE(service_id, environment, region, namespace)
+);
+
 CREATE TABLE IF NOT EXISTS config (
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL,
@@ -96,6 +113,11 @@ CREATE INDEX IF NOT EXISTS idx_actions_resource_id ON actions(resource_id);
 CREATE INDEX IF NOT EXISTS idx_actions_type ON actions(type);
 CREATE INDEX IF NOT EXISTS idx_actions_status ON actions(status);
 CREATE INDEX IF NOT EXISTS idx_actions_started_at ON actions(started_at);
+CREATE INDEX IF NOT EXISTS idx_deployments_service_id ON deployments(service_id);
+CREATE INDEX IF NOT EXISTS idx_deployments_kubernetes_repo_id ON deployments(kubernetes_repo_id);
+CREATE INDEX IF NOT EXISTS idx_deployments_commit_sha ON deployments(commit_sha);
+CREATE INDEX IF NOT EXISTS idx_deployments_environment ON deployments(environment);
+CREATE INDEX IF NOT EXISTS idx_deployments_region ON deployments(region);
 CREATE INDEX IF NOT EXISTS idx_projects_name ON projects(name);
 CREATE INDEX IF NOT EXISTS idx_tasks_project_id ON tasks(project_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_deadline ON tasks(deadline);
@@ -139,6 +161,12 @@ CREATE TRIGGER IF NOT EXISTS update_tasks_updated_at
     AFTER UPDATE ON tasks
 BEGIN
     UPDATE tasks SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
+END;
+
+CREATE TRIGGER IF NOT EXISTS update_deployments_updated_at
+    AFTER UPDATE ON deployments
+BEGIN
+    UPDATE deployments SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
 END;
 
 CREATE TRIGGER IF NOT EXISTS update_config_updated_at

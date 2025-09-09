@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a GitHub Dashboard application built with Wails (Go + React) for managing monorepo microservices and Kubernetes resources. The application provides:
+This is a Dev Dashboard application built with Wails (Go + React) for managing monorepo microservices and Kubernetes resources. The application provides:
 
 - Repository management for monorepos and Kubernetes resource repositories
 - Microservice discovery and build/deployment tracking
@@ -18,8 +18,7 @@ This is a GitHub Dashboard application built with Wails (Go + React) for managin
 - Go 1.23+ installed
 - Node.js 18+ and npm installed
 - Git configured
-- SSH key configured for Git access (for SSH authentication)
-- GITHUB_TOKEN environment variable set for API access (optional, for GitHub API features)
+- GITHUB_TOKEN environment variable set for API access (required for all GitHub features)
 
 ### Common Commands
 
@@ -41,22 +40,22 @@ wails build -platform darwin/universal
 
 # Run the built desktop application
 # Linux/Windows:
-./build/bin/gh-dashboard
+./build/bin/dev-dashboard
 # macOS (.app bundle created when built on macOS):
-open ./build/bin/GitHub\ Dashboard.app
+open ./build/bin/Dev\ Dashboard.app
 # or double-click the .app bundle in Finder
 
 # Create macOS DMG installer (macOS only, after building .app)
 # Install create-dmg tool: brew install create-dmg
 # Then create DMG:
 create-dmg \
-  --volname "GitHub Dashboard" \
+  --volname "Dev Dashboard" \
   --window-pos 200 120 \
   --window-size 600 300 \
   --icon-size 100 \
   --app-drop-link 425 120 \
-  "GitHub-Dashboard.dmg" \
-  "./build/bin/GitHub Dashboard.app"
+  "Dev-Dashboard.dmg" \
+  "./build/bin/Dev Dashboard.app"
 
 # Build frontend only
 cd frontend && npm run build
@@ -79,14 +78,8 @@ govulncheck ./...
 
 Create a `.env` file or set environment variables:
 ```bash
-# Optional: GitHub API token for enhanced features
+# Required: GitHub API token for repository access and enhanced features
 export GITHUB_TOKEN=your_github_personal_access_token
-
-# Optional: Custom SSH key path (defaults to ~/.ssh/id_rsa, ~/.ssh/id_ed25519, ~/.ssh/id_ecdsa)
-export SSH_KEY_PATH=/path/to/your/ssh/key
-
-# Optional: SSH key passphrase if required
-export SSH_PASSPHRASE=your_ssh_key_passphrase
 ```
 
 ## Architecture
@@ -120,9 +113,9 @@ export SSH_PASSPHRASE=your_ssh_key_passphrase
 ## Key Features
 
 ### Repository Management
-- Add monorepo and Kubernetes resource repositories via SSH or HTTPS URLs
+- Add monorepo and Kubernetes resource repositories via HTTPS URLs
 - Specify custom service name and location for monorepos
-- SSH key authentication for private repositories
+- GitHub Personal Access Token authentication for private repositories
 - Automatic service/resource discovery
 - Manual and automatic sync with GitHub
 
@@ -153,19 +146,33 @@ export SSH_PASSPHRASE=your_ssh_key_passphrase
 
 ### Desktop Application
 - Window size: 1200x800 (resizable, min: 800x600, max: 1920x1080)
-- Application title: "GitHub Dashboard"
+- Application title: "Dev Dashboard"
 - Native desktop application with system window controls
 - Light gray background optimized for the dashboard interface
 
 ### Database and API
-- SQLite database created at `~/.gh-dashboard/database.db`
+- SQLite database created at `~/.dev-dashboard/database.db`
 - Requires GitHub personal access token for API access
+- Supports GitHub.com and GitHub Enterprise Server
 - Background sync service runs every 5 minutes when token is provided
+
+### GitHub Integration Options
+
+**GitHub.com (Default):**
+- Leave Enterprise URL empty in Settings
+- Use standard GitHub Personal Access Token (ghp_xxx)
+- Access public and private repositories you have permission to
+
+**GitHub Enterprise Server:**
+- Configure Enterprise URL in Settings (e.g., https://github.company.com/api/v3)
+- Use Enterprise Personal Access Token (ghs_xxx or ghp_xxx depending on version)
+- Access your organization's repositories and resources
+- Supports all standard GitHub API features
 
 ### Development vs Production
 - Development (`wails dev`): Hot reloading enabled, may show browser option but runs as desktop app
-- Production (`wails build`): Creates native executable in `build/bin/gh-dashboard`
-- macOS Production: Creates `.app` bundle in `build/bin/GitHub Dashboard.app` (when built on macOS)
+- Production (`wails build`): Creates native executable in `build/bin/dev-dashboard`
+- macOS Production: Creates `.app` bundle in `build/bin/Dev Dashboard.app` (when built on macOS)
 - macOS DMG: Use `create-dmg` tool to create installable `.dmg` file from `.app` bundle
 - Cross-compilation: macOS builds must be done on macOS systems (cross-compilation not supported)
 - Built application includes all frontend assets and is completely self-contained
@@ -178,29 +185,29 @@ export SSH_PASSPHRASE=your_ssh_key_passphrase
 - When run from terminal: Logs appear in the terminal window
 - When run as `.app` bundle: Check Console.app for application logs
   - Open Applications → Utilities → Console.app
-  - Filter by "GitHub Dashboard" or search for your app name
+  - Filter by "Dev Dashboard" or search for your app name
   - Look for entries from your application process
 
 **Alternative methods for macOS:**
 ```bash
 # Run the app from terminal to see logs directly
-./build/bin/GitHub\ Dashboard.app/Contents/MacOS/gh-dashboard
+./build/bin/Dev\ Dashboard.app/Contents/MacOS/dev-dashboard
 
 # Or check system logs
-log stream --predicate 'process == "gh-dashboard"'
+log stream --predicate 'process == "dev-dashboard"'
 ```
 
 **Linux:**
-- Terminal output when running `./build/bin/gh-dashboard`
+- Terminal output when running `./build/bin/dev-dashboard`
 - System logs: `journalctl -f -u your-service-name` (if running as service)
 
 **Windows:**
-- Command prompt output when running `gh-dashboard.exe`
+- Command prompt output when running `dev-dashboard.exe`
 - Windows Event Viewer for application errors
 
 ### Database Location
-- **macOS/Linux**: `~/.gh-dashboard/database.db`
-- **Windows**: `%USERPROFILE%\.gh-dashboard\database.db`
+- **macOS/Linux**: `~/.dev-dashboard/database.db`
+- **Windows**: `%USERPROFILE%\.dev-dashboard\database.db`
 
 ### Troubleshooting Common Issues
 
@@ -218,4 +225,4 @@ log stream --predicate 'process == "gh-dashboard"'
 
 **Database Migration:**
 - The app automatically migrates existing databases to add new columns
-- If issues persist, backup and delete `~/.gh-dashboard/database.db` to force fresh schema creation
+- If issues persist, backup and delete `~/.dev-dashboard/database.db` to force fresh schema creation

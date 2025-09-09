@@ -132,6 +132,181 @@ func (db *DB) runMigrations() error {
 		}
 	}
 
+	// Check if deployments table exists
+	var deploymentsTableExists bool
+	err = db.conn.QueryRow(`
+		SELECT COUNT(*) > 0 
+		FROM sqlite_master 
+		WHERE type='table' AND name='deployments'
+	`).Scan(&deploymentsTableExists)
+	
+	if err != nil {
+		return fmt.Errorf("failed to check for deployments table: %w", err)
+	}
+
+	// Create deployments table if it doesn't exist
+	if !deploymentsTableExists {
+		_, err = db.conn.Exec(`
+			CREATE TABLE IF NOT EXISTS deployments (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				service_id INTEGER NOT NULL,
+				kubernetes_repo_id INTEGER NOT NULL,
+				commit_sha TEXT NOT NULL,
+				environment TEXT NOT NULL,
+				region TEXT NOT NULL,
+				tag TEXT NOT NULL,
+				path TEXT NOT NULL,
+				discovered_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+				updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+				FOREIGN KEY (service_id) REFERENCES microservices(id) ON DELETE CASCADE,
+				FOREIGN KEY (kubernetes_repo_id) REFERENCES repositories(id) ON DELETE CASCADE,
+				UNIQUE(service_id, environment, region)
+			)
+		`)
+		if err != nil {
+			return fmt.Errorf("failed to create deployments table: %w", err)
+		}
+
+		// Add indexes for deployments table
+		indexes := []string{
+			"CREATE INDEX IF NOT EXISTS idx_deployments_service_id ON deployments(service_id)",
+			"CREATE INDEX IF NOT EXISTS idx_deployments_kubernetes_repo_id ON deployments(kubernetes_repo_id)",
+			"CREATE INDEX IF NOT EXISTS idx_deployments_commit_sha ON deployments(commit_sha)",
+			"CREATE INDEX IF NOT EXISTS idx_deployments_environment ON deployments(environment)",
+			"CREATE INDEX IF NOT EXISTS idx_deployments_region ON deployments(region)",
+		}
+
+		for _, indexSQL := range indexes {
+			_, err = db.conn.Exec(indexSQL)
+			if err != nil {
+				return fmt.Errorf("failed to create deployments index: %w", err)
+			}
+		}
+
+		// Add the deployments table trigger
+		_, err = db.conn.Exec(`
+			CREATE TRIGGER IF NOT EXISTS update_deployments_updated_at
+				AFTER UPDATE ON deployments
+			BEGIN
+				UPDATE deployments SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
+			END
+		`)
+		if err != nil {
+			return fmt.Errorf("failed to create deployments trigger: %w", err)
+		}
+	} else {
+		// Check if namespace column exists in deployments table
+		var namespaceColumnExists bool
+		err = db.conn.QueryRow(`
+			SELECT COUNT(*) > 0 
+			FROM pragma_table_info('deployments') 
+			WHERE name = 'namespace'
+		`).Scan(&namespaceColumnExists)
+		
+		if err != nil {
+			return fmt.Errorf("failed to check for namespace column: %w", err)
+		}
+
+		// Add namespace column if it doesn't exist
+		if !namespaceColumnExists {
+			_, err = db.conn.Exec("ALTER TABLE deployments ADD COLUMN namespace TEXT")
+			if err != nil {
+				return fmt.Errorf("failed to add namespace column: %w", err)
+			}
+		}
+
+		// Update the unique constraint to include namespace
+		// Since SQLite doesn't support altering constraints, we need to check if the old constraint exists
+		// and recreate the table if necessary
+		var constraintExists bool
+		err = db.conn.QueryRow(`
+			SELECT COUNT(*) > 0 
+			FROM sqlite_master 
+			WHERE type = 'index' 
+			AND tbl_name = 'deployments' 
+			AND sql LIKE '%UNIQUE(service_id, environment, region, namespace)%'
+		`).Scan(&constraintExists)
+		
+		if err != nil {
+			return fmt.Errorf("failed to check for updated unique constraint: %w", err)
+		}
+
+		// If the constraint doesn't include namespace, we need to recreate the table
+		if !constraintExists {
+			// Create a temporary table with the new schema
+			_, err = db.conn.Exec(`
+				CREATE TABLE deployments_new (
+					id INTEGER PRIMARY KEY AUTOINCREMENT,
+					service_id INTEGER NOT NULL,
+					kubernetes_repo_id INTEGER NOT NULL,
+					commit_sha TEXT NOT NULL,
+					environment TEXT NOT NULL,
+					region TEXT NOT NULL,
+					namespace TEXT,
+					tag TEXT NOT NULL,
+					path TEXT NOT NULL,
+					discovered_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+					updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+					FOREIGN KEY (service_id) REFERENCES microservices(id) ON DELETE CASCADE,
+					FOREIGN KEY (kubernetes_repo_id) REFERENCES repositories(id) ON DELETE CASCADE,
+					UNIQUE(service_id, environment, region, namespace)
+				)
+			`)
+			if err != nil {
+				return fmt.Errorf("failed to create new deployments table: %w", err)
+			}
+
+			// Copy data from old table to new table
+			_, err = db.conn.Exec(`
+				INSERT INTO deployments_new (id, service_id, kubernetes_repo_id, commit_sha, environment, region, namespace, tag, path, discovered_at, updated_at)
+				SELECT id, service_id, kubernetes_repo_id, commit_sha, environment, region, namespace, tag, path, discovered_at, updated_at
+				FROM deployments
+			`)
+			if err != nil {
+				return fmt.Errorf("failed to copy data to new deployments table: %w", err)
+			}
+
+			// Drop the old table and rename the new one
+			_, err = db.conn.Exec("DROP TABLE deployments")
+			if err != nil {
+				return fmt.Errorf("failed to drop old deployments table: %w", err)
+			}
+
+			_, err = db.conn.Exec("ALTER TABLE deployments_new RENAME TO deployments")
+			if err != nil {
+				return fmt.Errorf("failed to rename new deployments table: %w", err)
+			}
+
+			// Recreate indexes and triggers
+			indexes := []string{
+				"CREATE INDEX IF NOT EXISTS idx_deployments_service_id ON deployments(service_id)",
+				"CREATE INDEX IF NOT EXISTS idx_deployments_kubernetes_repo_id ON deployments(kubernetes_repo_id)",
+				"CREATE INDEX IF NOT EXISTS idx_deployments_commit_sha ON deployments(commit_sha)",
+				"CREATE INDEX IF NOT EXISTS idx_deployments_environment ON deployments(environment)",
+				"CREATE INDEX IF NOT EXISTS idx_deployments_region ON deployments(region)",
+			}
+
+			for _, indexSQL := range indexes {
+				_, err = db.conn.Exec(indexSQL)
+				if err != nil {
+					return fmt.Errorf("failed to create deployments index: %w", err)
+				}
+			}
+
+			// Recreate the trigger
+			_, err = db.conn.Exec(`
+				CREATE TRIGGER IF NOT EXISTS update_deployments_updated_at
+					AFTER UPDATE ON deployments
+				BEGIN
+					UPDATE deployments SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
+				END
+			`)
+			if err != nil {
+				return fmt.Errorf("failed to create deployments trigger: %w", err)
+			}
+		}
+	}
+
 	return nil
 }
 
