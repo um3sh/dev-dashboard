@@ -136,11 +136,37 @@ func (m *RepositoryModel) UpdateLastSync(id int64) error {
 }
 
 func (m *RepositoryModel) Delete(id int64) error {
+	// Start a transaction to ensure atomic deletion
+	tx, err := m.db.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to start transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	// Enable foreign keys for this transaction to ensure CASCADE deletes work
+	if _, err := tx.Exec("PRAGMA foreign_keys = ON"); err != nil {
+		return fmt.Errorf("failed to enable foreign keys: %w", err)
+	}
+	
 	query := `DELETE FROM repositories WHERE id = ?`
 	
-	_, err := m.db.Exec(query, id)
+	result, err := tx.Exec(query, id)
 	if err != nil {
 		return fmt.Errorf("failed to delete repository: %w", err)
+	}
+
+	// Check if a row was actually deleted
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get affected rows: %w", err)
+	}
+	if rowsAffected == 0 {
+		return fmt.Errorf("repository with ID %d not found", id)
+	}
+
+	// Commit the transaction
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
 	return nil

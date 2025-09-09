@@ -325,29 +325,63 @@ type KustomizationDeployment struct {
 
 // ScanKustomizationFiles scans the Kubernetes repository for kustomization.yaml files
 func (c *Client) ScanKustomizationFiles(ctx context.Context, owner, repo string) ([]KustomizationDeployment, error) {
+	return c.ScanKustomizationFilesInPath(ctx, owner, repo, "")
+}
+
+// ScanKustomizationFilesInPath scans for kustomization files in a specific root path
+func (c *Client) ScanKustomizationFilesInPath(ctx context.Context, owner, repo, rootPath string) ([]KustomizationDeployment, error) {
 	var deployments []KustomizationDeployment
+
+	// Determine the search path
+	searchPath := "services" // Default path
+	if rootPath != "" && rootPath != "." {
+		searchPath = strings.Trim(rootPath, "/")
+		log.Printf("Using custom root path for kustomization scan: %s", searchPath)
+	} else {
+		log.Printf("Using default path for kustomization scan: %s", searchPath)
+	}
 
 	// Use Contents API to traverse repository structure instead of Search API
 	// This is more reliable for private repositories and newly created files
-	kustomizationPaths, err := c.findKustomizationFiles(ctx, owner, repo, "services", make([]string, 0))
+	kustomizationPaths, err := c.findKustomizationFiles(ctx, owner, repo, searchPath, make([]string, 0))
 	if err != nil {
-		return nil, fmt.Errorf("failed to find kustomization files: %w", err)
+		return nil, fmt.Errorf("failed to find kustomization files in path %s: %w", searchPath, err)
 	}
 
+	log.Printf("Found %d kustomization files in %s/%s path: %s", len(kustomizationPaths), owner, repo, searchPath)
+
 	for _, path := range kustomizationPaths {
+		log.Printf("Processing kustomization file: %s", path)
 		
 		// Parse service name, environment, region, and namespace from path
-		// Expected: services/service-b/overlays/prd/us-west-2/ns-a/kustomization.yaml
+		// Expected patterns:
+		// - services/service-b/overlays/prd/us-west-2/ns-a/kustomization.yaml (default)
+		// - k8s/service-b/overlays/prd/us-west-2/ns-a/kustomization.yaml (custom root)
+		// - rootpath/service-b/overlays/prd/us-west-2/ns-a/kustomization.yaml (custom root)
 		pathParts := strings.Split(path, "/")
-		if len(pathParts) < 7 || pathParts[0] != "services" || pathParts[2] != "overlays" {
+		
+		// Find the overlays directory to determine the structure
+		overlaysIndex := -1
+		for i, part := range pathParts {
+			if part == "overlays" {
+				overlaysIndex = i
+				break
+			}
+		}
+		
+		// We need at least: [root]/service/overlays/env/region/namespace/kustomization.yaml
+		// That's minimum 6 parts after finding overlays
+		if overlaysIndex < 1 || len(pathParts) < overlaysIndex + 4 {
+			log.Printf("Skipping kustomization file with unexpected path structure: %s", path)
 			continue
 		}
 
-		serviceName := pathParts[1]
-		// Skip overlays directory at pathParts[2]
-		environment := pathParts[3] 
-		region := pathParts[4]
-		namespace := pathParts[5]
+		serviceName := pathParts[overlaysIndex-1]  // Service is the directory before overlays
+		environment := pathParts[overlaysIndex+1]  // Environment is after overlays
+		region := pathParts[overlaysIndex+2]       // Region is after environment
+		namespace := pathParts[overlaysIndex+3]    // Namespace is after region
+		
+		log.Printf("Parsed kustomization: service=%s, env=%s, region=%s, namespace=%s", serviceName, environment, region, namespace)
 
 		// Get the content of the kustomization.yaml file
 		fileContent, _, _, err := c.gh.Repositories.GetContents(ctx, owner, repo, path, nil)

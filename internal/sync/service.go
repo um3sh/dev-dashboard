@@ -169,8 +169,9 @@ func (s *Service) syncKubernetesRepo(repo *types.Repository, owner, repoName str
 	if s.githubClient != nil {
 		log.Printf("Scanning kustomization files for Kubernetes repo: %s", repo.Name)
 		
-		// Use GitHub API to scan for kustomization.yaml files
-		kustomizationDeployments, err := s.githubClient.ScanKustomizationFiles(s.ctx, owner, repoName)
+		// Use GitHub API to scan for kustomization.yaml files with root path
+		rootPath := repo.ServiceLocation // Use service_location as root path for Kubernetes repos
+		kustomizationDeployments, err := s.githubClient.ScanKustomizationFilesInPath(s.ctx, owner, repoName, rootPath)
 		if err != nil {
 			log.Printf("Failed to scan kustomization files in %s: %v", repo.Name, err)
 		} else {
